@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+build
+.expo
+.expo-shared
+coverage
+__pycache__
+.pytest_cache
+.venv
+*.pyc
+*.pyo
+.DS_Store
+

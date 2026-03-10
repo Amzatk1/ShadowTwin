@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "ShadowTwin",
+    "slug": "shadowtwin",
+    "scheme": "shadowtwin",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "backgroundColor": "#0D1014"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0D1014"
+      }
+    }
+  }
+}
+

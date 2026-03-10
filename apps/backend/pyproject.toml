@@ -1,0 +1,21 @@
+[project]
+name = "shadowtwin-backend"
+version = "0.1.0"
+description = "FastAPI backend starter for ShadowTwin"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.6",
+  "uvicorn[standard]>=0.32.1",
+  "pydantic>=2.10.3",
+  "pydantic-settings>=2.6.1",
+  "sqlalchemy>=2.0.36",
+  "psycopg[binary]>=3.2.3",
+  "pgvector>=0.3.6",
+  "redis>=5.2.1",
+  "celery>=5.4.0"
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+

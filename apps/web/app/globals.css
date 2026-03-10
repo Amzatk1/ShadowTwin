@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-background: #f7f7f4;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f1ec;
+  --color-text: #121315;
+  --color-text-muted: #5d6168;
+  --color-border: #e2e4e8;
+  --color-accent: #5468ff;
+  --color-accent-soft: #eef1ff;
+  --color-success: #1f8f5f;
+  --color-warning: #c58a1a;
+  --color-danger: #c24e4e;
+}
+
+.dark {
+  --color-background: #0d1014;
+  --color-surface: #13171c;
+  --color-surface-muted: #1a2027;
+  --color-text: #f5f7fa;
+  --color-text-muted: #9aa3ae;
+  --color-border: #262e38;
+  --color-accent: #7c8dff;
+  --color-accent-soft: #1b2347;
+  --color-success: #39a976;
+  --color-warning: #d5a33c;
+  --color-danger: #d96b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: rgba(84, 104, 255, 0.14);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
