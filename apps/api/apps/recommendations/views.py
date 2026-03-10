@@ -1,22 +1,31 @@
+from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.workspaces.models import Membership, Workspace
+
+from .models import Recommendation
+from .serializers import FeedSerializer
+
 
 class FeedView(APIView):
-    def get(self, _request, workspace_slug: str):
-        return Response(
-            {
-                "workspace": workspace_slug,
-                "items": [
-                    {
-                        "id": "feed_1",
-                        "kind": "warning",
-                        "title": "Three follow-ups may slip today",
-                        "detail": "Two sales threads and one candidate recap are at risk based on your usual cadence.",
-                        "confidence": 0.84,
-                        "why": "These threads match past obligations that you typically close within one business day.",
-                    }
-                ],
-            }
-        )
-
+    def get(self, request, workspace_slug: str):
+        workspace = get_object_or_404(Workspace, slug=workspace_slug)
+        get_object_or_404(Membership, workspace=workspace, user=request.user)
+        recommendations = Recommendation.objects.filter(workspace=workspace).order_by("-created_at")[:10]
+        payload = {
+            "items": [
+                {
+                    "id": str(item.id),
+                    "kind": item.recommendation_type,
+                    "title": item.title,
+                    "detail": item.detail,
+                    "confidence": float(item.confidence),
+                    "why": item.why_visible,
+                    "createdAt": item.created_at,
+                }
+                for item in recommendations
+            ]
+        }
+        serializer = FeedSerializer(payload)
+        return Response(serializer.data)

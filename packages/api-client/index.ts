@@ -1,4 +1,13 @@
-import type { ActionItem, MeetingBrief, PrivacyControl, TwinInsight, TwinObservation, WorkflowSuggestion } from "@shadowtwin/shared-types";
+import type {
+  ActionItem,
+  ApprovalRequest,
+  MeetingBrief,
+  PrivacyControl,
+  TodayMetric,
+  TwinInsight,
+  TwinObservation,
+  WorkflowSuggestion,
+} from "@shadowtwin/shared-types";
 
 export type ApiClientOptions = {
   baseUrl: string;
@@ -6,6 +15,7 @@ export type ApiClientOptions = {
 };
 
 export type TodayResponse = {
+  metrics: TodayMetric[];
   priorities: string[];
   actionQueue: ActionItem[];
   meetings: MeetingBrief[];
@@ -30,6 +40,20 @@ export type ApprovalDecisionResponse = {
   status: "approved" | "rejected" | "snoozed" | "edited";
 };
 
+export type ApprovalQueueResponse = {
+  items: ApprovalRequest[];
+};
+
+export type LoginResponse = {
+  accessToken: string;
+  refreshToken: string;
+  workspaceSlug: string;
+  user: {
+    email: string;
+    fullName: string;
+  };
+};
+
 export type AutomationsResponse = {
   suggestions: WorkflowSuggestion[];
 };
@@ -44,7 +68,7 @@ async function request<T>(
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { Authorization: `Token ${token}` } : {}),
       ...(init.headers ?? {}),
     },
   });
@@ -61,7 +85,7 @@ export function createApiClient(options: ApiClientOptions) {
   return {
     auth: {
       login(email: string, password: string) {
-        return request<{ accessToken: string; refreshToken: string }>(
+        return request<LoginResponse>(
           "/auth/login/",
           {
             method: "POST",
@@ -77,6 +101,9 @@ export function createApiClient(options: ApiClientOptions) {
     feed(workspaceSlug: string) {
       return request<FeedResponse>(`/feed/${workspaceSlug}/`, { method: "GET" }, options);
     },
+    approvals(workspaceSlug: string) {
+      return request<ApprovalQueueResponse>(`/approvals/${workspaceSlug}/`, { method: "GET" }, options);
+    },
     privacy(workspaceSlug: string) {
       return request<PrivacyResponse>(`/privacy/${workspaceSlug}/`, { method: "GET" }, options);
     },
@@ -85,7 +112,7 @@ export function createApiClient(options: ApiClientOptions) {
     },
     decideApproval(approvalId: string, payload: ApprovalDecisionRequest) {
       return request<ApprovalDecisionResponse>(
-        `/approvals/${approvalId}/decision/`,
+        `/approvals/requests/${approvalId}/decision/`,
         {
           method: "POST",
           body: JSON.stringify(payload),
@@ -95,4 +122,3 @@ export function createApiClient(options: ApiClientOptions) {
     },
   };
 }
-

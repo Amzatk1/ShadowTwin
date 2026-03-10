@@ -11,7 +11,7 @@
     "dev:web": "npm run dev --workspace @shadowtwin/web",
     "dev:mobile": "npm run start --workspace @shadowtwin/mobile",
     "dev:api": "python apps/api/manage.py runserver 0.0.0.0:8000",
-    "dev:worker": "python -m celery -A shadowtwin_api.celery_app worker -l info --workdir apps/api",
+    "dev:worker": "python -m celery -A apps.worker.worker.celery_app worker -l info",
     "lint:web": "npm run lint --workspace @shadowtwin/web",
     "typecheck:web": "tsc --noEmit -p apps/web/tsconfig.json",
     "typecheck:mobile": "tsc --noEmit -p apps/mobile/tsconfig.json"

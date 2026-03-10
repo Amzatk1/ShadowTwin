@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import "@/app/globals.css";
 
 import { RootShell } from "@/components/root-shell";
+import { AppProviders } from "@/providers/app-providers";
 
 const heading = Fraunces({
   subsets: ["latin"],
@@ -29,7 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${heading.variable} ${body.variable} bg-canvas font-body text-ink`}>
-        <RootShell>{children}</RootShell>
+        <AppProviders>
+          <RootShell>{children}</RootShell>
+        </AppProviders>
       </body>
     </html>
   );

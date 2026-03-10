@@ -23,7 +23,10 @@ services:
       dockerfile: infrastructure/docker/api.Dockerfile
     command: python apps/api/manage.py runserver 0.0.0.0:8000
     env_file:
-      - .env.example
+      - apps/api/.env.example
+    environment:
+      DATABASE_URL: postgresql://shadowtwin:shadowtwin@postgres:5432/shadowtwin
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - .:/workspace
     working_dir: /workspace
@@ -37,9 +40,12 @@ services:
     build:
       context: .
       dockerfile: infrastructure/docker/api.Dockerfile
-    command: python -m celery -A shadowtwin_api.celery_app worker -l info --workdir apps/api
+    command: python -m celery -A apps.worker.worker.celery_app worker -l info
     env_file:
-      - .env.example
+      - apps/api/.env.example
+    environment:
+      DATABASE_URL: postgresql://shadowtwin:shadowtwin@postgres:5432/shadowtwin
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - .:/workspace
     working_dir: /workspace
@@ -60,4 +66,3 @@ services:
 
 volumes:
   postgres_data:
-

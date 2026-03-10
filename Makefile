@@ -11,7 +11,7 @@ run-api:
 	python apps/api/manage.py runserver 0.0.0.0:8000
 
 run-worker:
-	python -m celery -A shadowtwin_api.celery_app worker -l info --workdir apps/api
+	python -m celery -A apps.worker.worker.celery_app worker -l info
 
 migrate:
 	python apps/api/manage.py migrate
@@ -21,4 +21,3 @@ seed:
 
 test-api:
 	python apps/api/manage.py test
-

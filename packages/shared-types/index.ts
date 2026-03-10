@@ -7,6 +7,12 @@ export interface UserProfile {
   workspaceId: string;
 }
 
+export interface TodayMetric {
+  label: string;
+  value: string;
+  delta: string;
+}
+
 export interface WorkspaceProfile {
   id: string;
   name: string;
@@ -73,6 +79,8 @@ export interface ApprovalRequest {
   whySuggested: string;
   confidence: number;
   status: "pending" | "approved" | "rejected" | "snoozed" | "edited";
+  sourceLabel: string;
+  dueLabel: string;
 }
 
 export interface NotificationEvent {

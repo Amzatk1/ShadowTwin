@@ -7,9 +7,10 @@ class ApprovalRequest(models.Model):
     proposed_action = models.CharField(max_length=255)
     editable_payload = models.JSONField(default=dict)
     source_context = models.JSONField(default=dict)
+    source_label = models.CharField(max_length=128, default="ShadowTwin")
+    due_label = models.CharField(max_length=64, default="Today")
     why_suggested = models.TextField()
     confidence = models.DecimalField(max_digits=5, decimal_places=2)
     status = models.CharField(max_length=32, default="pending")
     snoozed_until = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-

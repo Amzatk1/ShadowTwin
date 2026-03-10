@@ -8,6 +8,7 @@ class Insight(models.Model):
     detail = models.TextField()
     rationale = models.TextField()
     confidence = models.DecimalField(max_digits=5, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class Recommendation(models.Model):
@@ -20,6 +21,7 @@ class Recommendation(models.Model):
     confidence = models.DecimalField(max_digits=5, decimal_places=2)
     approval_required = models.BooleanField(default=True)
     status = models.CharField(max_length=32, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
 
 
 class WorkflowPattern(models.Model):
@@ -29,4 +31,4 @@ class WorkflowPattern(models.Model):
     trigger_description = models.CharField(max_length=255)
     action_blueprint = models.JSONField(default=list)
     confidence = models.DecimalField(max_digits=5, decimal_places=2)
-
+    created_at = models.DateTimeField(auto_now_add=True)

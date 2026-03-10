@@ -9,6 +9,9 @@ class Workspace(models.Model):
     approval_mode = models.CharField(max_length=32, default="required")
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self) -> str:
+        return self.slug
+
 
 class Membership(models.Model):
     ROLE_CHOICES = [
@@ -23,3 +26,5 @@ class Membership(models.Model):
     role = models.CharField(max_length=24, choices=ROLE_CHOICES)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        unique_together = ("user", "workspace")
