@@ -1,0 +1,14 @@
+[project]
+name = "shadowtwin-worker"
+version = "0.1.0"
+description = "Celery worker for ShadowTwin jobs"
+requires-python = ">=3.12"
+dependencies = [
+  "celery>=5.4",
+  "redis>=5.2"
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+

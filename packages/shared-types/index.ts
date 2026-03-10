@@ -7,6 +7,13 @@ export interface UserProfile {
   workspaceId: string;
 }
 
+export interface WorkspaceProfile {
+  id: string;
+  name: string;
+  slug: string;
+  stage: TwinStage;
+}
+
 export interface TwinInsight {
   id: string;
   title: string;
@@ -60,3 +67,19 @@ export interface PrivacyControl {
   retention: string;
 }
 
+export interface ApprovalRequest {
+  id: string;
+  proposedAction: string;
+  whySuggested: string;
+  confidence: number;
+  status: "pending" | "approved" | "rejected" | "snoozed" | "edited";
+}
+
+export interface NotificationEvent {
+  id: string;
+  category: string;
+  title: string;
+  body: string;
+  channel: "push" | "email" | "in-app";
+  createdAt: string;
+}

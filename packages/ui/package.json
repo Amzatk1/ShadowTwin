@@ -1,0 +1,11 @@
+{
+  "name": "@shadowtwin/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "dependencies": {
+    "@shadowtwin/design-tokens": "*"
+  }
+}
+

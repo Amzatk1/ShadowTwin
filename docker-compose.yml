@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: shadowtwin
+      POSTGRES_USER: shadowtwin
+      POSTGRES_PASSWORD: shadowtwin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: python apps/api/manage.py runserver 0.0.0.0:8000
+    env_file:
+      - .env.example
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: python -m celery -A shadowtwin_api.celery_app worker -l info --workdir apps/api
+    env_file:
+      - .env.example
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    depends_on:
+      - api
+      - redis
+
+  web:
+    image: node:22-alpine
+    command: sh -lc "npm install && npm run dev:web"
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+

@@ -12,6 +12,12 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@shadowtwin/api-client": [
+        "packages/api-client/index.ts"
+      ],
+      "@shadowtwin/config": [
+        "packages/config/index.ts"
+      ],
       "@shadowtwin/design-tokens": [
         "packages/design-tokens/index.ts"
       ],
@@ -20,8 +26,16 @@
       ],
       "@shadowtwin/shared-types": [
         "packages/shared-types/index.ts"
+      ],
+      "@shadowtwin/ui": [
+        "packages/ui/index.ts"
+      ],
+      "@shadowtwin/utils": [
+        "packages/utils/index.ts"
+      ],
+      "@shadowtwin/validation": [
+        "packages/validation/index.ts"
       ]
     }
   }
 }
-

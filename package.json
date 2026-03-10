@@ -2,6 +2,7 @@
   "name": "shadowtwin",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "npm@10.9.0",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -9,8 +10,10 @@
   "scripts": {
     "dev:web": "npm run dev --workspace @shadowtwin/web",
     "dev:mobile": "npm run start --workspace @shadowtwin/mobile",
-    "dev:backend": "python -m uvicorn app.main:app --app-dir apps/backend --reload",
-    "lint:web": "npm run lint --workspace @shadowtwin/web"
+    "dev:api": "python apps/api/manage.py runserver 0.0.0.0:8000",
+    "dev:worker": "python -m celery -A shadowtwin_api.celery_app worker -l info --workdir apps/api",
+    "lint:web": "npm run lint --workspace @shadowtwin/web",
+    "typecheck:web": "tsc --noEmit -p apps/web/tsconfig.json",
+    "typecheck:mobile": "tsc --noEmit -p apps/mobile/tsconfig.json"
   }
 }
-
