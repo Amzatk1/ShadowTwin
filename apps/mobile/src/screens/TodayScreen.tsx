@@ -7,11 +7,28 @@ import {
   ScreenContainer,
   SectionCard,
   Chip,
+  ToneChip,
 } from "../components/ui";
 import { apiClient } from "../services/api";
 import { useAppStore } from "../store/useAppStore";
 import { useSessionStore } from "../store/useSessionStore";
 import { palette } from "../theme/tokens";
+
+function syncTone(syncHealthState: string): "default" | "accent" | "success" | "warning" | "danger" {
+  if (syncHealthState === "healthy") {
+    return "success";
+  }
+  if (syncHealthState === "syncing" || syncHealthState === "recovering") {
+    return "accent";
+  }
+  if (syncHealthState === "degraded" || syncHealthState === "idle") {
+    return "warning";
+  }
+  if (syncHealthState === "failed" || syncHealthState === "needs_reconnect") {
+    return "danger";
+  }
+  return "default";
+}
 
 export function TodayScreen() {
   const openCapture = useAppStore((state) => state.openCapture);
@@ -53,6 +70,9 @@ export function TodayScreen() {
 
   const priorities = todayQuery.data?.priorities ?? [];
   const approvals = approvalsQuery.data?.items ?? [];
+  const integrations = integrationsQuery.data?.items ?? [];
+  const integrationIssues = integrations.filter((item) => item.syncHealthState !== "healthy");
+  const connectedSources = integrations.filter((item) => item.status !== "pending-auth").length;
 
   return (
     <ScreenContainer
@@ -90,7 +110,45 @@ export function TodayScreen() {
             </Text>
           </View>
         ) : null}
+        {integrations.length ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+            <ToneChip
+              label={`${connectedSources} source${connectedSources === 1 ? "" : "s"} connected`}
+              tone={connectedSources > 0 ? "success" : "warning"}
+            />
+            {integrationIssues.length ? (
+              <ToneChip
+                label={`${integrationIssues.length} source${integrationIssues.length === 1 ? "" : "s"} need attention`}
+                tone="warning"
+              />
+            ) : (
+              <ToneChip label="Sync healthy" tone="success" />
+            )}
+          </View>
+        ) : null}
       </SectionCard>
+      {integrationIssues.length ? (
+        <SectionCard
+          title="Connection health"
+          description="Today stays useful only if provider sync remains truthful. Reconnect or resync on web when a source drops out of policy or loses access."
+        >
+          {integrationIssues.map((item) => (
+            <View key={item.id} style={{ marginBottom: 12 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                <ToneChip label={item.displayName} tone="default" />
+                <ToneChip label={item.syncHealthState.replace("_", " ")} tone={syncTone(item.syncHealthState)} />
+              </View>
+              <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 20, marginTop: 8 }}>
+                {item.lastSyncError
+                  ? item.lastSyncError
+                  : item.requiresReauth
+                    ? "Google needs to be reconnected on web before Today can trust new data."
+                    : "This source is still stabilizing after sync. Review the integrations workspace on web for details."}
+              </Text>
+            </View>
+          ))}
+        </SectionCard>
+      ) : null}
       {!onboardingQuery.data?.completedAt ? (
         <SectionCard
           title="Finish setup on web"

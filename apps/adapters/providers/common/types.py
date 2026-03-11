@@ -17,6 +17,10 @@ class ProviderEmailMessage:
     recipients: list[str]
     body: str
     sent_at: datetime
+    provider_message_id: str = ""
+    labels: list[str] = field(default_factory=list)
+    raw_payload_ref: str = ""
+    metadata: dict = field(default_factory=dict)
     extracted_commitments: list[str] = field(default_factory=list)
 
 
@@ -32,6 +36,10 @@ class ProviderEmailThread:
     summary: str
     source_url: str
     messages: list[ProviderEmailMessage]
+    provider_thread_id: str = ""
+    labels: list[str] = field(default_factory=list)
+    raw_payload_ref: str = ""
+    provider_updated_at: datetime | None = None
 
 
 @dataclass(slots=True)
@@ -43,6 +51,13 @@ class ProviderMeeting:
     participants: list[str]
     priority: str
     summary: str
+    provider_event_id: str = ""
+    organizer: str = ""
+    source_timezone: str = ""
+    meeting_url: str = ""
+    event_status: str = "confirmed"
+    raw_payload_ref: str = ""
+    provider_updated_at: datetime | None = None
 
 
 @dataclass(slots=True)

@@ -12,10 +12,10 @@
 | `OPENAI_API_KEY` | api, worker | AI provider access |
 | `GOOGLE_CLIENT_ID` | api | Google auth and integrations |
 | `GOOGLE_CLIENT_SECRET` | api | Google auth and integrations |
+| `GOOGLE_REDIRECT_URI` | api | Google OAuth callback target for local/web flows |
 | `MICROSOFT_CLIENT_ID` | api | Microsoft auth and integrations |
 | `MICROSOFT_CLIENT_SECRET` | api | Microsoft auth and integrations |
 | `ENCRYPTION_KEY` | api | Secret and token encryption |
 | `SENTRY_DSN` | web, mobile, api, worker | Error reporting |
 | `FEATURE_APPROVAL_AUTOMATIONS` | web, mobile | UI feature flag |
 | `FEATURE_DELEGATE_MODE` | web, mobile | Advanced automation gate |
-

@@ -20,6 +20,23 @@ from .serializers import (
     IntegrationScopeUpdateSerializer,
 )
 from .services import complete_google_oauth_callback, start_google_connection
+from .services import enqueue_google_sync
+
+
+def _sync_health_state(connection: IntegrationConnection) -> str:
+    if connection.requires_reauth or connection.status == "reauth-required":
+        return "needs_reconnect"
+    if connection.status == "pending-auth":
+        return "idle"
+    if connection.status == "syncing":
+        return "recovering" if "recover" in connection.sync_mode else "syncing"
+    if connection.status == "partial-sync" or connection.last_sync_status == "partial":
+        return "degraded"
+    if connection.status == "sync-failed" or connection.last_sync_status == "failed":
+        return "failed"
+    if connection.status == "connected" and connection.last_sync_status == "synced":
+        return "healthy"
+    return "idle"
 
 
 def _serialize_connection(connection: IntegrationConnection):
@@ -32,9 +49,16 @@ def _serialize_connection(connection: IntegrationConnection):
         "providerEmail": connection.provider_email,
         "mode": connection.mode,
         "status": connection.status,
+        "syncHealthState": _sync_health_state(connection),
         "grantedScopes": connection.granted_scopes,
         "requiresReauth": connection.requires_reauth,
         "lastSyncError": connection.last_sync_error or None,
+        "lastSyncStatus": connection.last_sync_status,
+        "lastSyncStartedAt": connection.last_sync_started_at,
+        "lastSyncCompletedAt": connection.last_sync_completed_at,
+        "lastSyncErrorCode": connection.last_sync_error_code,
+        "syncMode": connection.sync_mode,
+        "syncCursor": connection.sync_cursor,
         "capabilities": connection.capabilities,
         "syncState": connection.sync_state,
         "lastSyncedAt": connection.last_synced_at,
@@ -164,5 +188,26 @@ class IntegrationScopesView(APIView):
             object_id=str(connection.id),
             integration=connection.provider,
             metadata={"scopeCount": len(serializer.validated_data)},
+        )
+        return Response({"integration": IntegrationConnectionSerializer(_serialize_connection(connection)).data})
+
+
+class IntegrationSyncView(APIView):
+    def post(self, request, connection_id: str):
+        connection = get_object_or_404(IntegrationConnection, pk=connection_id)
+        get_object_or_404(Membership, workspace=connection.workspace, user=request.user)
+        connection = enqueue_google_sync(
+            connection=connection,
+            workspace=connection.workspace,
+            user=request.user,
+        )
+        AuditEvent.objects.create(
+            workspace=connection.workspace,
+            actor=request.user,
+            action_type="integration.sync.requested",
+            object_type="integration_connection",
+            object_id=str(connection.id),
+            integration=connection.provider,
+            metadata={"syncMode": connection.sync_mode, "status": connection.status},
         )
         return Response({"integration": IntegrationConnectionSerializer(_serialize_connection(connection)).data})

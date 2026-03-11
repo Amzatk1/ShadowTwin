@@ -56,6 +56,22 @@ function meetingTone(priority: string) {
   return "default" as const;
 }
 
+function syncHealthTone(syncHealthState: string) {
+  if (syncHealthState === "healthy") {
+    return "success" as const;
+  }
+  if (syncHealthState === "syncing" || syncHealthState === "recovering") {
+    return "accent" as const;
+  }
+  if (syncHealthState === "degraded" || syncHealthState === "idle") {
+    return "warning" as const;
+  }
+  if (syncHealthState === "failed" || syncHealthState === "needs_reconnect") {
+    return "danger" as const;
+  }
+  return "default" as const;
+}
+
 export function TodayWorkspace() {
   const queryClient = useQueryClient();
   const { accessToken, workspaceSlug, hasHydrated, clearSession } = useSessionStore((state) => ({
@@ -101,6 +117,21 @@ export function TodayWorkspace() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["today", workspaceSlug] }),
         queryClient.invalidateQueries({ queryKey: ["approvals", workspaceSlug] }),
+      ]);
+    },
+  });
+  const syncMutation = useMutation({
+    mutationFn: (connectionId: string) => apiClient.triggerIntegrationSync(connectionId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["integrations", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["today", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["approvals", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["feed", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["email-threads", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings-workspace", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["memory", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["notifications", workspaceSlug] }),
       ]);
     },
   });
@@ -202,6 +233,7 @@ export function TodayWorkspace() {
   const goals = todayQuery.data.twinOverview.goals.length > 0 ? todayQuery.data.twinOverview.goals : onboardingQuery.data?.goals ?? [];
   const connectedSources = integrationsQuery.data.items.length;
   const unreadApprovals = approvalsQuery.data.items.filter((item) => item.status === "pending").length;
+  const sourceIssues = integrationsQuery.data.items.filter((item) => item.syncHealthState !== "healthy");
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
@@ -217,6 +249,7 @@ export function TodayWorkspace() {
             <Badge>{todayQuery.data.twinOverview.minimalModeEnabled ? "minimal mode" : "suggest mode"}</Badge>
             <Badge>{connectedSources} connected source{connectedSources === 1 ? "" : "s"}</Badge>
             <Badge>{Math.round(todayQuery.data.twinOverview.confidenceScore * 100)}% learned confidence</Badge>
+            {sourceIssues.length > 0 ? <Badge tone="warning">{sourceIssues.length} source{sourceIssues.length === 1 ? "" : "s"} need attention</Badge> : <Badge tone="success">sync healthy</Badge>}
           </div>
           <div className="mt-4 grid gap-4 md:grid-cols-[1.15fr,0.85fr]">
             <div className="rounded-[24px] border border-line bg-surface/80 p-5">
@@ -299,6 +332,58 @@ export function TodayWorkspace() {
         </Panel>
       </div>
       <div className="space-y-6">
+        <Panel
+          title="Source health"
+          description="Provider truth, reconnect state, and sync posture are visible here so the brief never hides uncertainty."
+        >
+          <div className="space-y-3">
+            {integrationsQuery.data.items.map((connection) => (
+              <div className="rounded-[24px] border border-line bg-canvas p-4 shadow-card" key={connection.id}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="font-medium text-ink">{connection.displayName}</div>
+                      <Badge tone={syncHealthTone(connection.syncHealthState)}>{connection.syncHealthState.replace("_", " ")}</Badge>
+                      <Badge>{connection.mode.replace("-", " ")}</Badge>
+                      {connection.requiresReauth ? <Badge tone="danger">reconnect needed</Badge> : null}
+                    </div>
+                    <div className="text-sm text-ink-muted">
+                      {connection.providerEmail || connection.accountLabel || "Awaiting provider account label"}
+                    </div>
+                    <div className="text-xs uppercase tracking-[0.18em] text-ink-muted">
+                      {connection.lastSyncCompletedAt
+                        ? `Last sync / ${new Date(connection.lastSyncCompletedAt).toLocaleString()} / ${connection.lastSyncStatus}`
+                        : `Sync state / ${connection.lastSyncStatus}`}
+                    </div>
+                    {connection.lastSyncError ? (
+                      <div className="text-sm leading-6 text-danger">
+                        {connection.lastSyncErrorCode ? `${connection.lastSyncErrorCode} / ` : ""}
+                        {connection.lastSyncError}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-full border border-line px-3 py-2 text-sm text-ink transition hover:bg-surface disabled:opacity-60"
+                      disabled={syncMutation.isPending || connection.status === "pending-auth" || connection.requiresReauth}
+                      onClick={() => syncMutation.mutate(connection.id)}
+                      type="button"
+                    >
+                      {syncMutation.isPending ? <Loader2 className="inline animate-spin" size={14} /> : null}
+                      <span className="ml-1">{connection.requiresReauth ? "Reconnect on web" : "Run sync"}</span>
+                    </button>
+                    <Link
+                      className="inline-flex items-center rounded-full border border-line px-3 py-2 text-sm text-ink transition hover:bg-surface"
+                      href="/workspace/integrations"
+                    >
+                      Open integrations
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
         <Panel title="Priority strip" description="The API-driven top items most likely to affect the day.">
           <div className="space-y-3">
             {todayQuery.data.priorities.map((priority, index) => (

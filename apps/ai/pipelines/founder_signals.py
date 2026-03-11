@@ -114,7 +114,11 @@ def rebuild_founder_signal_layer(*, workspace, user):
         EmailThread.objects.filter(workspace=workspace, status="active")
         .order_by("-last_message_at")[:5]
     )
-    meetings = list(Meeting.objects.filter(workspace=workspace).order_by("starts_at")[:3])
+    meetings = list(
+        Meeting.objects.filter(workspace=workspace)
+        .exclude(event_status="cancelled")
+        .order_by("starts_at")[:3]
+    )
     primary_goal = twin.goals[0] if twin.goals else "Reduce follow-up drops"
     role_focus = ROLE_FOCUS.get(twin.operator_role, ROLE_FOCUS["founder"])
     goal_hint = GOAL_HINTS.get(primary_goal, GOAL_HINTS["Reduce follow-up drops"])

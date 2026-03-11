@@ -9,7 +9,12 @@ from django.utils import timezone
 
 from apps.adapters.providers.common.types import ProviderEmailThread, ProviderMeeting, ProviderScope
 from apps.adapters.providers.google.demo import build_founder_demo_bundle
-from apps.adapters.providers.google.oauth import GoogleOAuthAdapter
+from apps.adapters.providers.google.oauth import (
+    GoogleOAuthAdapter,
+    GoogleOAuthError,
+    GoogleReauthRequiredError,
+    GoogleSyncRecoveryRequiredError,
+)
 from apps.ai.pipelines.founder_signals import rebuild_founder_signal_layer
 from apps.approvals.models import ApprovalRequest
 from apps.audit.models import AuditEvent
@@ -79,9 +84,14 @@ def ensure_google_demo_connection(*, workspace, user, mode: str, selected_scopes
             "metadata": {"demoMode": True},
             "granted_scopes": _requested_google_oauth_scopes(selected),
             "capabilities": _build_capabilities(selected, mode=mode, demo_mode=True),
-            "sync_state": {"lastSyncMode": "demo"},
-            "requires_reauth": False,
+            "sync_state": {},
+            "sync_cursor": {},
+            "sync_mode": "demo",
+            "last_sync_status": "pending",
             "last_sync_error": "",
+            "last_sync_error_code": "",
+            "last_sync_error_message": "",
+            "requires_reauth": False,
             "is_enabled": True,
         },
     )
@@ -145,8 +155,13 @@ def start_google_connection(*, workspace, user, mode: str, selected_scopes: list
             "granted_scopes": [],
             "capabilities": _build_capabilities(selected, mode=mode, demo_mode=False),
             "sync_state": {},
-            "requires_reauth": False,
+            "sync_cursor": {},
+            "sync_mode": "bootstrap",
+            "last_sync_status": "pending",
             "last_sync_error": "",
+            "last_sync_error_code": "",
+            "last_sync_error_message": "",
+            "requires_reauth": False,
             "is_enabled": True,
         },
     )
@@ -221,8 +236,14 @@ def complete_google_oauth_callback(*, user, code: str, state: str) -> Integratio
         "profileName": profile.get("name", ""),
     }
     connection.capabilities = _build_capabilities(selected_scopes, mode=mode, demo_mode=False)
-    connection.requires_reauth = False
+    connection.sync_cursor = {}
+    connection.sync_state = {}
+    connection.sync_mode = "bootstrap"
+    connection.last_sync_status = "pending"
     connection.last_sync_error = ""
+    connection.last_sync_error_code = ""
+    connection.last_sync_error_message = ""
+    connection.requires_reauth = False
     connection.save(
         update_fields=[
             "provider_account_id",
@@ -234,8 +255,14 @@ def complete_google_oauth_callback(*, user, code: str, state: str) -> Integratio
             "granted_scopes",
             "metadata",
             "capabilities",
-            "requires_reauth",
+            "sync_cursor",
+            "sync_state",
+            "sync_mode",
+            "last_sync_status",
             "last_sync_error",
+            "last_sync_error_code",
+            "last_sync_error_message",
+            "requires_reauth",
             "updated_at",
         ]
     )
@@ -294,7 +321,8 @@ def enqueue_google_sync(*, connection: IntegrationConnection, workspace, user) -
     try:
         sync_gmail_threads.delay(str(connection.id))
         connection.status = "syncing"
-        connection.save(update_fields=["status", "updated_at"])
+        connection.last_sync_status = "queued"
+        connection.save(update_fields=["status", "last_sync_status", "updated_at"])
         return connection
     except Exception:
         return sync_google_connection(connection=connection, workspace=workspace, user=user)
@@ -310,11 +338,7 @@ def sync_google_demo_connection(*, connection, workspace, user):
     bundle = build_founder_demo_bundle()
     _ensure_workspace_defaults(workspace=workspace, user=user)
     allowed_scopes = set(connection.scopes or DEFAULT_SCOPE_PATHS)
-
-    connection.status = "syncing"
-    connection.requires_reauth = False
-    connection.last_sync_error = ""
-    connection.save(update_fields=["status", "requires_reauth", "last_sync_error", "updated_at"])
+    _mark_sync_started(connection=connection, sync_mode="demo")
 
     EmailThread.objects.filter(workspace=workspace, external_id__startswith="gmail-thread-").delete()
     Meeting.objects.filter(workspace=workspace, external_id__startswith="calendar-").delete()
@@ -358,16 +382,20 @@ def sync_google_demo_connection(*, connection, workspace, user):
             },
         )
 
+    _mark_sync_success(
+        connection=connection,
+        sync_mode="demo",
+        sync_cursor={},
+        sync_state={
+            "lastSyncMode": "demo",
+            "syncedThreadCount": synced_thread_count,
+            "syncedMeetingCount": synced_meeting_count,
+        },
+        last_sync_status="synced",
+        connection_status="connected",
+    )
     connection.granted_scopes = _requested_google_oauth_scopes(sorted(allowed_scopes))
-    connection.last_synced_at = timezone.now()
-    connection.status = "connected"
-    connection.sync_state = {
-        **(connection.sync_state or {}),
-        "lastSyncMode": "demo",
-        "syncedThreadCount": synced_thread_count,
-        "syncedMeetingCount": synced_meeting_count,
-    }
-    connection.save(update_fields=["granted_scopes", "last_synced_at", "status", "sync_state", "updated_at"])
+    connection.save(update_fields=["granted_scopes", "updated_at"])
 
     rebuild_founder_signal_layer(workspace=workspace, user=user)
     AuditEvent.objects.create(
@@ -382,6 +410,7 @@ def sync_google_demo_connection(*, connection, workspace, user):
             "scopeCount": len(allowed_scopes),
             "threadCount": synced_thread_count,
             "meetingCount": synced_meeting_count,
+            "syncMode": "demo",
             "live": False,
         },
     )
@@ -392,12 +421,10 @@ def sync_google_live_connection(*, connection: IntegrationConnection, workspace,
     _ensure_workspace_defaults(workspace=workspace, user=user)
     adapter = GoogleOAuthAdapter()
     selected_scopes = set(connection.scopes or DEFAULT_SCOPE_PATHS)
-    sync_state = connection.sync_state or {}
-
-    connection.status = "syncing"
-    connection.requires_reauth = False
-    connection.last_sync_error = ""
-    connection.save(update_fields=["status", "requires_reauth", "last_sync_error", "updated_at"])
+    sync_cursor = dict(connection.sync_cursor or {})
+    sync_state = dict(connection.sync_state or {})
+    sync_mode = "incremental" if sync_cursor else "bootstrap"
+    _mark_sync_started(connection=connection, sync_mode=sync_mode)
 
     try:
         access_token = _resolve_google_access_token(connection=connection, adapter=adapter)
@@ -420,45 +447,108 @@ def sync_google_live_connection(*, connection: IntegrationConnection, workspace,
                 ]
             )
 
+        failures: list[tuple[str, str]] = []
         synced_thread_count = 0
         synced_meeting_count = 0
+
         if any(scope_path.startswith("gmail://") for scope_path in selected_scopes):
-            threads, email_state = adapter.fetch_recent_threads(
-                access_token=access_token,
-                max_results=20,
-                sync_state=sync_state,
-            )
-            synced_thread_count = _sync_email_threads(
-                workspace=workspace,
-                connection=connection,
-                account_email=connection.provider_email,
-                threads=threads,
-            )
-            sync_state.update(email_state)
+            try:
+                synced_thread_count, email_cursor, email_state = _sync_google_live_email(
+                    adapter=adapter,
+                    access_token=access_token,
+                    connection=connection,
+                    workspace=workspace,
+                    account_email=connection.provider_email,
+                    sync_cursor=sync_cursor,
+                )
+                sync_cursor.update(email_cursor)
+                sync_state.update(email_state)
+            except GoogleReauthRequiredError as exc:
+                failures.append(("google_auth_invalid", str(exc)))
+            except GoogleOAuthError as exc:
+                failures.append(("gmail_sync_failed", str(exc)))
 
         if "calendar://primary" in selected_scopes:
-            meetings, calendar_state = adapter.fetch_upcoming_events(
-                access_token=access_token,
-                max_results=12,
-                sync_state=sync_state,
-            )
-            synced_meeting_count = _sync_meetings(
-                workspace=workspace,
-                connection=connection,
-                account_email=connection.provider_email,
-                meetings=meetings,
-            )
-            sync_state.update(calendar_state)
+            try:
+                synced_meeting_count, calendar_cursor, calendar_state = _sync_google_live_calendar(
+                    adapter=adapter,
+                    access_token=access_token,
+                    connection=connection,
+                    workspace=workspace,
+                    account_email=connection.provider_email,
+                    sync_cursor=sync_cursor,
+                )
+                sync_cursor.update(calendar_cursor)
+                sync_state.update(calendar_state)
+            except GoogleReauthRequiredError as exc:
+                failures.append(("google_auth_invalid", str(exc)))
+            except GoogleOAuthError as exc:
+                failures.append(("calendar_sync_failed", str(exc)))
 
-        connection.status = "connected"
-        connection.last_synced_at = timezone.now()
-        connection.sync_state = {
-            **sync_state,
-            "lastSyncMode": "live",
-            "syncedThreadCount": synced_thread_count,
-            "syncedMeetingCount": synced_meeting_count,
-        }
-        connection.save(update_fields=["status", "last_synced_at", "sync_state", "updated_at"])
+        if failures:
+            error_code = failures[0][0]
+            error_message = " | ".join(message for _, message in failures)[:500]
+            if synced_thread_count or synced_meeting_count:
+                _mark_sync_success(
+                    connection=connection,
+                    sync_mode=sync_mode,
+                    sync_cursor=sync_cursor,
+                    sync_state={
+                        **sync_state,
+                        "syncedThreadCount": synced_thread_count,
+                        "syncedMeetingCount": synced_meeting_count,
+                    },
+                    last_sync_status="partial",
+                    connection_status="partial-sync",
+                    error_code=error_code,
+                    error_message=error_message,
+                )
+                rebuild_founder_signal_layer(workspace=workspace, user=user)
+                AuditEvent.objects.create(
+                    workspace=workspace,
+                    actor=user,
+                    action_type="integration.google.sync.partial",
+                    object_type="integration_connection",
+                    object_id=str(connection.id),
+                    integration="google",
+                    metadata={
+                        "threadCount": synced_thread_count,
+                        "meetingCount": synced_meeting_count,
+                        "errors": failures,
+                    },
+                )
+            else:
+                _mark_sync_failure(
+                    connection=connection,
+                    connection_status="reauth-required" if error_code == "google_auth_invalid" else "sync-failed",
+                    last_sync_status="reauth-required" if error_code == "google_auth_invalid" else "failed",
+                    error_code=error_code,
+                    error_message=error_message,
+                    requires_reauth=error_code == "google_auth_invalid",
+                )
+                AuditEvent.objects.create(
+                    workspace=workspace,
+                    actor=user,
+                    action_type="integration.google.sync.failed",
+                    object_type="integration_connection",
+                    object_id=str(connection.id),
+                    integration="google",
+                    metadata={"errors": failures},
+                )
+            return connection
+
+        _mark_sync_success(
+            connection=connection,
+            sync_mode=sync_mode,
+            sync_cursor=sync_cursor,
+            sync_state={
+                **sync_state,
+                "syncedThreadCount": synced_thread_count,
+                "syncedMeetingCount": synced_meeting_count,
+            },
+            last_sync_status="synced",
+            connection_status="connected",
+        )
         rebuild_founder_signal_layer(workspace=workspace, user=user)
         AuditEvent.objects.create(
             workspace=workspace,
@@ -472,14 +562,20 @@ def sync_google_live_connection(*, connection: IntegrationConnection, workspace,
                 "scopeCount": len(selected_scopes),
                 "threadCount": synced_thread_count,
                 "meetingCount": synced_meeting_count,
+                "syncMode": sync_mode,
                 "live": True,
             },
         )
-    except Exception as exc:
-        connection.status = "reauth-required" if "invalid_grant" in str(exc) else "sync-failed"
-        connection.requires_reauth = connection.status == "reauth-required"
-        connection.last_sync_error = str(exc)[:500]
-        connection.save(update_fields=["status", "requires_reauth", "last_sync_error", "updated_at"])
+        return connection
+    except GoogleReauthRequiredError as exc:
+        _mark_sync_failure(
+            connection=connection,
+            connection_status="reauth-required",
+            last_sync_status="reauth-required",
+            error_code="google_auth_invalid",
+            error_message=str(exc),
+            requires_reauth=True,
+        )
         AuditEvent.objects.create(
             workspace=workspace,
             actor=user,
@@ -487,15 +583,108 @@ def sync_google_live_connection(*, connection: IntegrationConnection, workspace,
             object_type="integration_connection",
             object_id=str(connection.id),
             integration="google",
-            metadata={"error": connection.last_sync_error},
+            metadata={"error": str(exc), "code": "google_auth_invalid"},
+        )
+    except GoogleOAuthError as exc:
+        _mark_sync_failure(
+            connection=connection,
+            connection_status="sync-failed",
+            last_sync_status="failed",
+            error_code="google_sync_failed",
+            error_message=str(exc),
+        )
+        AuditEvent.objects.create(
+            workspace=workspace,
+            actor=user,
+            action_type="integration.google.sync.failed",
+            object_type="integration_connection",
+            object_id=str(connection.id),
+            integration="google",
+            metadata={"error": str(exc), "code": "google_sync_failed"},
         )
     return connection
+
+
+def _sync_google_live_email(
+    *,
+    adapter: GoogleOAuthAdapter,
+    access_token: str,
+    connection: IntegrationConnection,
+    workspace,
+    account_email: str,
+    sync_cursor: dict,
+) -> tuple[int, dict, dict]:
+    email_cursor = {"gmailHistoryId": sync_cursor.get("gmailHistoryId")} if sync_cursor.get("gmailHistoryId") else {}
+    email_state: dict[str, object] = {}
+    try:
+        threads, next_cursor = adapter.fetch_recent_threads(
+            access_token=access_token,
+            max_results=20,
+            sync_state=email_cursor,
+        )
+    except GoogleSyncRecoveryRequiredError:
+        threads, next_cursor = adapter.fetch_recent_threads(
+            access_token=access_token,
+            max_results=20,
+            sync_state={},
+        )
+        email_state["gmailRecoveryPerformed"] = True
+        email_state["gmailSyncMode"] = "recovery-bootstrap"
+    else:
+        email_state["gmailSyncMode"] = "incremental" if email_cursor else "bootstrap"
+    synced_thread_count = _sync_email_threads(
+        workspace=workspace,
+        connection=connection,
+        account_email=account_email,
+        threads=threads,
+    )
+    email_state["gmailSyncedThreadCount"] = synced_thread_count
+    email_state["gmailLastSyncAt"] = timezone.now().isoformat()
+    return synced_thread_count, {"gmailHistoryId": next_cursor.get("gmailHistoryId", "")}, email_state
+
+
+def _sync_google_live_calendar(
+    *,
+    adapter: GoogleOAuthAdapter,
+    access_token: str,
+    connection: IntegrationConnection,
+    workspace,
+    account_email: str,
+    sync_cursor: dict,
+) -> tuple[int, dict, dict]:
+    calendar_cursor = {"calendarSyncToken": sync_cursor.get("calendarSyncToken")} if sync_cursor.get("calendarSyncToken") else {}
+    calendar_state: dict[str, object] = {}
+    try:
+        meetings, next_cursor = adapter.fetch_upcoming_events(
+            access_token=access_token,
+            max_results=12,
+            sync_state=calendar_cursor,
+        )
+    except GoogleSyncRecoveryRequiredError:
+        meetings, next_cursor = adapter.fetch_upcoming_events(
+            access_token=access_token,
+            max_results=12,
+            sync_state={},
+        )
+        calendar_state["calendarRecoveryPerformed"] = True
+        calendar_state["calendarSyncMode"] = "recovery-bootstrap"
+    else:
+        calendar_state["calendarSyncMode"] = "incremental" if calendar_cursor else "bootstrap"
+    synced_meeting_count = _sync_meetings(
+        workspace=workspace,
+        connection=connection,
+        account_email=account_email,
+        meetings=meetings,
+    )
+    calendar_state["calendarSyncedMeetingCount"] = synced_meeting_count
+    calendar_state["calendarLastSyncAt"] = timezone.now().isoformat()
+    return synced_meeting_count, {"calendarSyncToken": next_cursor.get("calendarSyncToken", "")}, calendar_state
 
 
 def _resolve_google_access_token(*, connection: IntegrationConnection, adapter: GoogleOAuthAdapter) -> str:
     token_ref = OAuthTokenRef.objects.filter(connection=connection).first()
     if token_ref is None:
-        raise RuntimeError("No Google token reference is available for this connection.")
+        raise GoogleOAuthError("No Google token reference is available for this connection.")
 
     refresh_token = decrypt_secret(token_ref.refresh_token_ciphertext) if token_ref.refresh_token_ciphertext else ""
     access_token = decrypt_secret(token_ref.access_token_ciphertext) if token_ref.access_token_ciphertext else ""
@@ -503,12 +692,12 @@ def _resolve_google_access_token(*, connection: IntegrationConnection, adapter: 
     if access_token and not expires_soon:
         return access_token
     if not refresh_token:
-        raise RuntimeError("Google refresh token is missing. Reconnect the account.")
+        raise GoogleReauthRequiredError("Google refresh token is missing. Reconnect the account.")
 
     refresh_payload = adapter.refresh_access_token(refresh_token=refresh_token)
     next_access_token = refresh_payload.get("access_token", "")
     if not next_access_token:
-        raise RuntimeError("Google refresh did not return a new access token.")
+        raise GoogleReauthRequiredError("Google refresh did not return a new access token.")
     token_ref.access_token_ciphertext = encrypt_secret(next_access_token)
     token_ref.token_type = refresh_payload.get("token_type", token_ref.token_type)
     token_ref.issued_at = timezone.now()
@@ -527,7 +716,18 @@ def _resolve_google_access_token(*, connection: IntegrationConnection, adapter: 
     connection.granted_scopes = token_ref.granted_scopes
     connection.requires_reauth = False
     connection.last_sync_error = ""
-    connection.save(update_fields=["granted_scopes", "requires_reauth", "last_sync_error", "updated_at"])
+    connection.last_sync_error_code = ""
+    connection.last_sync_error_message = ""
+    connection.save(
+        update_fields=[
+            "granted_scopes",
+            "requires_reauth",
+            "last_sync_error",
+            "last_sync_error_code",
+            "last_sync_error_message",
+            "updated_at",
+        ]
+    )
     return next_access_token
 
 
@@ -630,15 +830,21 @@ def _sync_email_threads(
             workspace=workspace,
             external_id=thread.external_id,
             defaults={
+                "provider_source": "google",
+                "provider_thread_id": thread.provider_thread_id or thread.external_id,
                 "subject": thread.subject[:255],
                 "participants": sorted({_safe_email(value) for value in thread.participants if value}),
+                "labels": thread.labels,
                 "last_message_at": thread.last_message_at,
+                "provider_updated_at": thread.provider_updated_at or thread.last_message_at,
                 "waiting_on": waiting_on,
                 "needs_reply": needs_reply,
                 "is_sensitive": thread.is_sensitive,
                 "summary": thread.summary,
                 "source_url": thread.source_url,
                 "status": "active",
+                "raw_payload_ref": thread.raw_payload_ref,
+                "normalization_version": 1,
             },
         )
         thread_record.messages.all().delete()
@@ -653,11 +859,16 @@ def _sync_email_threads(
             commitments.extend(message.extracted_commitments)
             EmailMessage.objects.create(
                 thread=thread_record,
+                provider_message_id=message.provider_message_id,
                 sender=sender_email,
                 recipients=recipients,
                 direction="outbound" if sender_email == account_email else "inbound",
                 body=message.body,
                 summary=thread.summary,
+                labels=message.labels,
+                raw_payload_ref=message.raw_payload_ref,
+                metadata=message.metadata,
+                normalization_version=1,
                 extracted_commitments=message.extracted_commitments,
                 sent_at=message.sent_at,
             )
@@ -687,6 +898,8 @@ def _sync_email_threads(
                     "subject": thread.subject,
                     "needsReply": needs_reply,
                     "commitmentCount": len(commitments),
+                    "providerThreadId": thread.provider_thread_id or thread.external_id,
+                    "labels": thread.labels,
                 },
             },
         )
@@ -707,12 +920,21 @@ def _sync_meetings(
             workspace=workspace,
             external_id=meeting.external_id,
             defaults={
+                "provider_source": "google",
+                "provider_event_id": meeting.provider_event_id or meeting.external_id,
                 "title": meeting.title[:255],
+                "organizer": meeting.organizer,
                 "starts_at": meeting.starts_at,
                 "ends_at": meeting.ends_at,
                 "participants": meeting.participants,
-                "priority": meeting.priority,
+                "source_timezone": meeting.source_timezone,
+                "meeting_url": meeting.meeting_url,
+                "event_status": meeting.event_status,
+                "provider_updated_at": meeting.provider_updated_at or meeting.starts_at,
+                "priority": "low" if meeting.event_status == "cancelled" else meeting.priority,
                 "summary": meeting.summary,
+                "raw_payload_ref": meeting.raw_payload_ref,
+                "normalization_version": 1,
             },
         )
         IngestionEvent.objects.update_or_create(
@@ -728,11 +950,111 @@ def _sync_meetings(
                 "sensitivity": "standard",
                 "status": "processed",
                 "processed_at": timezone.now(),
-                "payload": {"title": meeting.title, "startsAt": meeting.starts_at.isoformat()},
+                "payload": {
+                    "title": meeting.title,
+                    "startsAt": meeting.starts_at.isoformat(),
+                    "providerEventId": meeting.provider_event_id or meeting.external_id,
+                    "status": meeting.event_status,
+                },
             },
         )
         synced_count += 1
     return synced_count
+
+
+def _mark_sync_started(*, connection: IntegrationConnection, sync_mode: str) -> None:
+    connection.status = "syncing"
+    connection.sync_mode = sync_mode
+    connection.last_sync_started_at = timezone.now()
+    connection.last_sync_status = "syncing"
+    connection.last_sync_error = ""
+    connection.last_sync_error_code = ""
+    connection.last_sync_error_message = ""
+    connection.requires_reauth = False
+    connection.save(
+        update_fields=[
+            "status",
+            "sync_mode",
+            "last_sync_started_at",
+            "last_sync_status",
+            "last_sync_error",
+            "last_sync_error_code",
+            "last_sync_error_message",
+            "requires_reauth",
+            "updated_at",
+        ]
+    )
+
+
+def _mark_sync_success(
+    *,
+    connection: IntegrationConnection,
+    sync_mode: str,
+    sync_cursor: dict,
+    sync_state: dict,
+    last_sync_status: str,
+    connection_status: str,
+    error_code: str = "",
+    error_message: str = "",
+) -> None:
+    completed_at = timezone.now()
+    connection.status = connection_status
+    connection.sync_mode = sync_mode
+    connection.sync_cursor = sync_cursor
+    connection.sync_state = sync_state
+    connection.last_sync_completed_at = completed_at
+    connection.last_sync_status = last_sync_status
+    connection.last_sync_error_code = error_code
+    connection.last_sync_error_message = error_message
+    connection.last_sync_error = error_message
+    connection.last_synced_at = completed_at
+    connection.requires_reauth = False
+    connection.save(
+        update_fields=[
+            "status",
+            "sync_mode",
+            "sync_cursor",
+            "sync_state",
+            "last_sync_completed_at",
+            "last_sync_status",
+            "last_sync_error_code",
+            "last_sync_error_message",
+            "last_sync_error",
+            "last_synced_at",
+            "requires_reauth",
+            "updated_at",
+        ]
+    )
+
+
+def _mark_sync_failure(
+    *,
+    connection: IntegrationConnection,
+    connection_status: str,
+    last_sync_status: str,
+    error_code: str,
+    error_message: str,
+    requires_reauth: bool = False,
+) -> None:
+    connection.status = connection_status
+    connection.last_sync_status = last_sync_status
+    connection.last_sync_error_code = error_code
+    connection.last_sync_error_message = error_message[:1000]
+    connection.last_sync_error = error_message[:500]
+    connection.requires_reauth = requires_reauth
+    connection.last_sync_completed_at = timezone.now()
+    connection.save(
+        update_fields=[
+            "status",
+            "last_sync_status",
+            "last_sync_error_code",
+            "last_sync_error_message",
+            "last_sync_error",
+            "requires_reauth",
+            "last_sync_completed_at",
+            "updated_at",
+        ]
+    )
 
 
 def _display_name(value: str) -> str:

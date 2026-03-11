@@ -13,7 +13,11 @@ class MeetingListView(APIView):
         workspace_slug = request.query_params.get("workspaceSlug")
         workspace = get_object_or_404(Workspace, slug=workspace_slug)
         get_object_or_404(Membership, workspace=workspace, user=request.user)
-        meetings = Meeting.objects.filter(workspace=workspace).order_by("starts_at")
+        meetings = (
+            Meeting.objects.filter(workspace=workspace)
+            .exclude(event_status="cancelled")
+            .order_by("starts_at")
+        )
         payload = {
             "items": [
                 {

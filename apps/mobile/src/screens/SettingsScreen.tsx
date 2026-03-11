@@ -1,12 +1,29 @@
-import { useQuery } from "@tanstack/react-query";
-import { Pressable, Text } from "react-native";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pressable, Text, View } from "react-native";
 
-import { RowItem, ScreenContainer, SectionCard } from "../components/ui";
+import { ActionButton, RowItem, ScreenContainer, SectionCard, ToneChip } from "../components/ui";
 import { apiClient } from "../services/api";
 import { useSessionStore } from "../store/useSessionStore";
 import { palette, radii, spacing } from "../theme/tokens";
 
+function syncTone(syncHealthState: string): "default" | "accent" | "success" | "warning" | "danger" {
+  if (syncHealthState === "healthy") {
+    return "success";
+  }
+  if (syncHealthState === "syncing" || syncHealthState === "recovering") {
+    return "accent";
+  }
+  if (syncHealthState === "degraded" || syncHealthState === "idle") {
+    return "warning";
+  }
+  if (syncHealthState === "failed" || syncHealthState === "needs_reconnect") {
+    return "danger";
+  }
+  return "default";
+}
+
 export function SettingsScreen() {
+  const queryClient = useQueryClient();
   const { workspaceSlug, clearSession } = useSessionStore((state) => ({
     workspaceSlug: state.workspaceSlug,
     clearSession: state.clearSession,
@@ -31,6 +48,24 @@ export function SettingsScreen() {
     queryFn: () => apiClient.notifications(workspaceSlug!),
     enabled: Boolean(workspaceSlug),
   });
+  const syncMutation = useMutation({
+    mutationFn: (connectionId: string) => apiClient.triggerIntegrationSync(connectionId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["mobile-integrations", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-today", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-feed", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-approvals", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-memory", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-notifications", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-email", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["mobile-meetings", workspaceSlug] }),
+      ]);
+    },
+  });
+  const unhealthyConnections = integrationsQuery.data?.items.filter(
+    (item) => item.syncHealthState !== "healthy",
+  ) ?? [];
 
   return (
     <ScreenContainer
@@ -59,20 +94,85 @@ export function SettingsScreen() {
         title="Connected systems"
         description="Connections are provider-first and server-side. Mobile is for review, not for silent native app control."
       >
+        {unhealthyConnections.length ? (
+          <View style={{ marginBottom: spacing.md, gap: spacing.sm }}>
+            <ToneChip
+              label={`${unhealthyConnections.length} source${unhealthyConnections.length > 1 ? "s" : ""} need review`}
+              tone="warning"
+            />
+            <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 20 }}>
+              Sync health now reflects real provider state. Reconnect or resync on web if a source keeps degrading or loses scope access.
+            </Text>
+          </View>
+        ) : null}
         {integrationsQuery.isLoading ? (
           <RowItem title="Loading connections" detail="Checking Gmail, Calendar, and other provider-linked sources." />
         ) : null}
         {integrationsQuery.data?.items.length ? (
           integrationsQuery.data.items.map((item) => (
-            <RowItem
+            <View
               key={item.id}
-              title={`${item.displayName} / ${item.mode}`}
-              detail={
-                item.lastSyncedAt
-                  ? `Last sync ${new Date(item.lastSyncedAt).toLocaleString()}`
-                  : "Connected and waiting for first sync."
-              }
-            />
+              style={{
+                borderRadius: radii.md,
+                borderWidth: 1,
+                borderColor: palette.border,
+                backgroundColor: palette.surfaceMuted,
+                padding: spacing.md,
+                marginBottom: spacing.sm,
+                gap: spacing.sm,
+              }}
+            >
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }}>
+                <ToneChip label={item.syncHealthState.replace("_", " ")} tone={syncTone(item.syncHealthState)} />
+                <ToneChip label={item.mode.replace("-", " ")} tone="default" />
+                {item.requiresReauth ? <ToneChip label="Reconnect needed" tone="danger" /> : null}
+              </View>
+              <Text style={{ color: palette.text, fontSize: 15, fontWeight: "700" }}>
+                {item.displayName}
+              </Text>
+              <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 20 }}>
+                {item.providerEmail || item.accountLabel}
+              </Text>
+              <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 20 }}>
+                {item.lastSyncCompletedAt
+                  ? `Last sync ${new Date(item.lastSyncCompletedAt).toLocaleString()} / ${item.lastSyncStatus}`
+                  : `Sync state / ${item.lastSyncStatus}`}
+              </Text>
+              <Text style={{ color: palette.textMuted, fontSize: 13, lineHeight: 20 }}>
+                {item.syncMode === "bootstrap"
+                  ? "Bootstrap sync imports a bounded recent window first."
+                  : item.syncMode === "incremental"
+                    ? "Incremental sync keeps Today fresh without replaying the full inbox or calendar."
+                    : `Sync mode / ${item.syncMode}`}
+              </Text>
+              {item.lastSyncError ? (
+                <Text style={{ color: palette.danger, fontSize: 13, lineHeight: 20 }}>
+                  {item.lastSyncErrorCode ? `${item.lastSyncErrorCode} / ` : ""}
+                  {item.lastSyncError}
+                </Text>
+              ) : null}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }}>
+                <ActionButton
+                  disabled={
+                    item.status === "pending-auth" ||
+                    syncMutation.isPending
+                  }
+                  label={
+                    syncMutation.isPending
+                      ? "Running sync..."
+                      : item.requiresReauth
+                        ? "Reconnect on web"
+                        : "Run sync"
+                  }
+                  onPress={() => {
+                    if (!item.requiresReauth) {
+                      syncMutation.mutate(item.id);
+                    }
+                  }}
+                  tone={item.requiresReauth ? "danger" : "accent"}
+                />
+              </View>
+            </View>
           ))
         ) : (
           <RowItem

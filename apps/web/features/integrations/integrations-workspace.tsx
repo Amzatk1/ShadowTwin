@@ -1,9 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCcw } from "lucide-react";
 
-import { Badge, Panel } from "@/components/ui";
+import { Badge, Button, Panel } from "@/components/ui";
 import { LoginPanel } from "@/features/auth/login-panel";
 import { GoogleConnectPanel } from "@/features/integrations/google-connect-panel";
 import { apiClient } from "@/lib/api";
@@ -33,16 +33,16 @@ const plannedProviders = [
 ];
 
 function statusTone(status: string): "default" | "accent" | "success" | "warning" | "danger" {
-  if (status === "connected") {
+  if (status === "healthy" || status === "connected") {
     return "success";
   }
-  if (status === "syncing" || status === "pending-auth") {
+  if (status === "syncing" || status === "pending-auth" || status === "recovering") {
     return "accent";
   }
-  if (status === "reauth-required") {
+  if (status === "reauth-required" || status === "partial-sync" || status === "degraded" || status === "needs_reconnect") {
     return "warning";
   }
-  if (status === "sync-failed") {
+  if (status === "sync-failed" || status === "failed") {
     return "danger";
   }
   return "default";
@@ -104,6 +104,21 @@ export function IntegrationsWorkspace() {
     },
   });
 
+  const syncMutation = useMutation({
+    mutationFn: (connectionId: string) => apiClient.triggerIntegrationSync(connectionId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["integrations", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["today", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["feed", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["email-threads", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings-workspace", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["notifications", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["audit", workspaceSlug] }),
+      ]);
+    },
+  });
+
   if (!hasHydrated) {
     return (
       <div className="rounded-[28px] border border-line bg-surface p-6 text-sm text-ink-muted">
@@ -139,7 +154,9 @@ export function IntegrationsWorkspace() {
         >
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Badge tone={statusTone(connection.status)}>{connection.status}</Badge>
+            <Badge tone={statusTone(connection.syncHealthState)}>{connection.syncHealthState.replace("_", " ")}</Badge>
             <Badge>{connection.mode}</Badge>
+            <Badge>{connection.syncMode}</Badge>
             {connection.providerEmail ? <Badge>{connection.providerEmail}</Badge> : null}
             {connection.requiresReauth ? <Badge tone="warning">Reconnect needed</Badge> : null}
           </div>
@@ -169,11 +186,34 @@ export function IntegrationsWorkspace() {
               </div>
             </div>
           </div>
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.18em] text-ink-muted">
+            <span>Last run / {connection.lastSyncStatus}</span>
+            <span>
+              Started / {connection.lastSyncStartedAt ? new Date(connection.lastSyncStartedAt).toLocaleString() : "Not yet"}
+            </span>
+            <span>
+              Completed / {connection.lastSyncCompletedAt ? new Date(connection.lastSyncCompletedAt).toLocaleString() : "Pending"}
+            </span>
+            {connection.lastSyncErrorCode ? <span>Error code / {connection.lastSyncErrorCode}</span> : null}
+          </div>
           {connection.lastSyncError ? (
             <div className="mb-4 rounded-2xl border border-danger/20 bg-danger/10 px-4 py-3 text-sm text-danger">
               {connection.lastSyncError}
             </div>
           ) : null}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <Button
+              disabled={syncMutation.isPending || connection.status === "pending-auth"}
+              onClick={() => syncMutation.mutate(connection.id)}
+              variant="secondary"
+            >
+              {syncMutation.isPending ? <Loader2 className="animate-spin" size={16} /> : <RefreshCcw size={16} />}
+              Run sync
+            </Button>
+            <div className="text-sm text-ink-muted">
+              Use this to validate bootstrap, incremental refresh, and reconnect handling against real provider state.
+            </div>
+          </div>
           <div className="mb-4 flex flex-wrap gap-2">
             {(["read-only", "approval-required"] as const).map((mode) => (
               <button

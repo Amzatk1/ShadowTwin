@@ -141,6 +141,34 @@ export interface IntegrationScope {
   excluded: boolean;
 }
 
+export interface IntegrationCapabilities {
+  emailRead: boolean;
+  calendarRead: boolean;
+  emailSend: boolean;
+  calendarWrite: boolean;
+  messagingSend: boolean;
+  demoMode: boolean;
+}
+
+export interface IntegrationSyncCursor {
+  gmailHistoryId?: string;
+  calendarSyncToken?: string;
+}
+
+export interface IntegrationSyncState {
+  lastSyncMode?: string;
+  syncedThreadCount?: number;
+  syncedMeetingCount?: number;
+  gmailSyncMode?: string;
+  gmailRecoveryPerformed?: boolean;
+  gmailSyncedThreadCount?: number;
+  gmailLastSyncAt?: string;
+  calendarSyncMode?: string;
+  calendarRecoveryPerformed?: boolean;
+  calendarSyncedMeetingCount?: number;
+  calendarLastSyncAt?: string;
+}
+
 export interface IntegrationConnection {
   id: string;
   provider: string;
@@ -149,11 +177,25 @@ export interface IntegrationConnection {
   providerEmail: string;
   mode: "read-only" | "approval-required" | "action-enabled";
   status: string;
+  syncHealthState:
+    | "idle"
+    | "syncing"
+    | "healthy"
+    | "degraded"
+    | "needs_reconnect"
+    | "recovering"
+    | "failed";
   grantedScopes: string[];
   requiresReauth: boolean;
   lastSyncError: string | null;
-  capabilities: Record<string, unknown>;
-  syncState: Record<string, unknown>;
+  lastSyncStatus: string;
+  lastSyncStartedAt: string | null;
+  lastSyncCompletedAt: string | null;
+  lastSyncErrorCode: string;
+  syncMode: string;
+  syncCursor: IntegrationSyncCursor;
+  capabilities: IntegrationCapabilities;
+  syncState: IntegrationSyncState;
   lastSyncedAt: string | null;
   scopes: IntegrationScope[];
 }

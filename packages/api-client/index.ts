@@ -326,6 +326,15 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       );
     },
+    triggerIntegrationSync(connectionId: string) {
+      return request<GoogleConnectResponse>(
+        `/integrations/${connectionId}/sync/`,
+        {
+          method: "POST",
+        },
+        options,
+      );
+    },
     audit(workspaceSlug: string) {
       return request<AuditResponse>(`/audit/?workspaceSlug=${workspaceSlug}`, { method: "GET" }, options);
     },
