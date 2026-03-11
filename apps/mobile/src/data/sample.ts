@@ -1,15 +1,15 @@
 export const onboardingSteps = [
   {
     title: "Your private operational twin",
-    copy: "ShadowTwin learns how you prepare, prioritize, and follow through. It starts with observation and stays calm, precise, and approval-first.",
+    copy: "ShadowTwin learns how you prepare, prioritize, and follow through. It starts with observation and stays calm, precise, and approval-first for any high-context operator.",
   },
   {
     title: "Privacy explained upfront",
     copy: "Connect only the sources you want. Start in minimal mode. Sensitive items can be excluded, deleted, or marked do not learn.",
   },
   {
-    title: "Built for review on the move",
-    copy: "Use mobile for approvals, meeting prep, fast capture, and memory retrieval without dragging the full desktop system into your pocket.",
+    title: "Founder-first, broadly useful",
+    copy: "The first flows are optimized for founders and CEOs, but the core system also fits operators, chiefs of staff, recruiters, and other high-context users.",
   },
 ];
 

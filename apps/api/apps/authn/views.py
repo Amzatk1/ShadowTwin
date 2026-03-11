@@ -62,6 +62,8 @@ class RefreshView(APIView):
 
 
 class LogoutView(APIView):
+    permission_classes = [AllowAny]
+
     def post(self, request):
         auth_session = getattr(request, "auth_session", None)
         if auth_session is None:

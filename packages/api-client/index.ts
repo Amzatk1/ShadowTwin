@@ -2,11 +2,17 @@ import type {
   ActionItem,
   ApprovalRequest,
   AuditEventRecord,
+  EmailThreadRecord,
   IntegrationConnection,
+  MemoryRecord,
   MeetingBrief,
+  MeetingRecord,
+  NotificationEvent,
+  OnboardingProfile,
   PrivacySnapshot,
   SessionPayload,
   TodayMetric,
+  TwinOverview,
   UserProfile,
   TwinInsight,
   TwinObservation,
@@ -21,6 +27,7 @@ export type ApiClientOptions = {
 };
 
 export type TodayResponse = {
+  twinOverview: TwinOverview;
   metrics: TodayMetric[];
   priorities: string[];
   actionQueue: ActionItem[];
@@ -67,8 +74,14 @@ export type GoogleConnectRequest = {
   selectedScopes?: string[];
 };
 
+export type GoogleCallbackRequest = {
+  code: string;
+  state: string;
+};
+
 export type GoogleConnectResponse = {
   integration: IntegrationConnection;
+  authUrl?: string;
   demoMode?: boolean;
   requiresExternalConsent?: boolean;
 };
@@ -95,6 +108,30 @@ export type RecommendationStatusResponse = {
 
 export type AuditResponse = {
   items: AuditEventRecord[];
+};
+
+export type MemoryResponse = {
+  items: MemoryRecord[];
+};
+
+export type EmailThreadsResponse = {
+  items: EmailThreadRecord[];
+};
+
+export type MeetingsResponse = {
+  items: MeetingRecord[];
+};
+
+export type NotificationsResponse = {
+  items: NotificationEvent[];
+};
+
+export type OnboardingUpdateRequest = {
+  workspaceSlug: string;
+  operatorRole?: string;
+  goals?: string[];
+  minimalModeEnabled?: boolean;
+  stage?: "observe" | "suggest" | "assist" | "delegate";
 };
 
 async function request<T>(
@@ -137,6 +174,10 @@ async function request<T>(
     throw new Error(`API ${response.status}: ${body}`);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return (await response.json()) as T;
 }
 
@@ -154,7 +195,14 @@ export function createApiClient(options: ApiClientOptions) {
         );
       },
       login(email: string, password: string) {
-        return this.token(email, password);
+        return request<LoginResponse>(
+          "/auth/token/",
+          {
+            method: "POST",
+            body: JSON.stringify({ email, password }),
+          },
+          options,
+        );
       },
       refresh(refreshToken: string) {
         return request<LoginResponse>(
@@ -181,6 +229,23 @@ export function createApiClient(options: ApiClientOptions) {
     },
     me() {
       return request<UserProfile>("/auth/me/", { method: "GET" }, options);
+    },
+    onboarding(workspaceSlug: string) {
+      return request<OnboardingProfile>(
+        `/today/setup/?workspaceSlug=${workspaceSlug}`,
+        { method: "GET" },
+        options,
+      );
+    },
+    updateOnboarding(payload: OnboardingUpdateRequest) {
+      return request<OnboardingProfile>(
+        "/today/setup/",
+        {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        },
+        options,
+      );
     },
     today(workspaceSlug: string) {
       return request<TodayResponse>(`/today/${workspaceSlug}/`, { method: "GET" }, options);
@@ -224,6 +289,16 @@ export function createApiClient(options: ApiClientOptions) {
     connectGoogle(payload: GoogleConnectRequest) {
       return request<GoogleConnectResponse>(
         "/integrations/google/connect/",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+        options,
+      );
+    },
+    completeGoogleCallback(payload: GoogleCallbackRequest) {
+      return request<GoogleConnectResponse>(
+        "/integrations/google/callback/",
         {
           method: "POST",
           body: JSON.stringify(payload),
@@ -275,9 +350,44 @@ export function createApiClient(options: ApiClientOptions) {
         options,
       );
     },
+    memory(workspaceSlug: string) {
+      return request<MemoryResponse>(
+        `/memory/?workspaceSlug=${workspaceSlug}`,
+        { method: "GET" },
+        options,
+      );
+    },
+    emailThreads(workspaceSlug: string) {
+      return request<EmailThreadsResponse>(
+        `/email/?workspaceSlug=${workspaceSlug}`,
+        { method: "GET" },
+        options,
+      );
+    },
+    meetingsWorkspace(workspaceSlug: string) {
+      return request<MeetingsResponse>(
+        `/meetings/?workspaceSlug=${workspaceSlug}`,
+        { method: "GET" },
+        options,
+      );
+    },
     excludeMemoryLearning(memoryId: string) {
       return request<{ id: string; learnEnabled: boolean }>(
         `/memory/${memoryId}/exclude-learning/`,
+        { method: "POST" },
+        options,
+      );
+    },
+    notifications(workspaceSlug: string) {
+      return request<NotificationsResponse>(
+        `/notifications/?workspaceSlug=${workspaceSlug}`,
+        { method: "GET" },
+        options,
+      );
+    },
+    readNotification(notificationId: string) {
+      return request<{ id: string; status: string }>(
+        `/notifications/${notificationId}/read/`,
         { method: "POST" },
         options,
       );

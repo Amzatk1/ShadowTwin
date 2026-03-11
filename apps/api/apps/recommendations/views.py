@@ -17,7 +17,7 @@ class FeedView(APIView):
         recommendations = (
             Recommendation.objects.filter(workspace=workspace)
             .exclude(status="dismissed")
-            .order_by("-pinned_at", "-created_at")[:10]
+            .order_by("-pinned_at", "-confidence", "-created_at")[:10]
         )
         payload = {
             "items": [
@@ -28,6 +28,8 @@ class FeedView(APIView):
                     "detail": item.detail,
                     "confidence": float(item.confidence),
                     "why": item.why_visible,
+                    "riskLevel": item.risk_level,
+                    "sourceRefs": item.source_refs,
                     "createdAt": item.created_at,
                 }
                 for item in recommendations

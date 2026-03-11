@@ -1,4 +1,5 @@
-import { MeetingsView, WorkspaceShell } from "@/components/site";
+import { WorkspaceShell } from "@/components/site";
+import { MeetingsWorkspace } from "@/features/meetings/meetings-workspace";
 
 export default function MeetingsPage() {
   return (
@@ -6,8 +7,7 @@ export default function MeetingsPage() {
       title="Meetings"
       subtitle="Preparation briefs, people context, transcript summaries, extracted tasks, and follow-up drafting live in one approval-oriented workspace."
     >
-      <MeetingsView />
+      <MeetingsWorkspace />
     </WorkspaceShell>
   );
 }
-

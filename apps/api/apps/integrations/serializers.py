@@ -18,6 +18,11 @@ class GoogleConnectSerializer(serializers.Serializer):
     )
 
 
+class GoogleCallbackSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    state = serializers.CharField()
+
+
 class IntegrationModeSerializer(serializers.Serializer):
     mode = serializers.ChoiceField(choices=["read-only", "approval-required", "action-enabled"])
 
@@ -37,8 +42,14 @@ class IntegrationConnectionSerializer(serializers.Serializer):
     provider = serializers.CharField()
     displayName = serializers.CharField()
     accountLabel = serializers.CharField()
+    providerEmail = serializers.CharField(allow_blank=True)
     mode = serializers.CharField()
     status = serializers.CharField()
+    grantedScopes = serializers.ListField(child=serializers.CharField())
+    requiresReauth = serializers.BooleanField()
+    lastSyncError = serializers.CharField(allow_blank=True, allow_null=True)
+    capabilities = serializers.JSONField()
+    syncState = serializers.JSONField()
     lastSyncedAt = serializers.DateTimeField(allow_null=True)
     scopes = IntegrationScopeSerializer(many=True)
 

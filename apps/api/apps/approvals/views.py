@@ -35,6 +35,8 @@ class ApprovalQueueView(APIView):
                         "status": item.status,
                         "sourceLabel": item.source_label,
                         "dueLabel": item.due_label,
+                        "payloadKind": item.editable_payload.get("kind", ""),
+                        "sourceCount": len(item.source_context) if isinstance(item.source_context, dict) else 0,
                     }
                     for item in approvals
                 ]

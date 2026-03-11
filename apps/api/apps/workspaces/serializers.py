@@ -34,7 +34,17 @@ class TwinInsightSerializer(serializers.Serializer):
     createdAt = serializers.DateTimeField()
 
 
+class TwinOverviewSerializer(serializers.Serializer):
+    operatorRole = serializers.CharField()
+    stage = serializers.CharField()
+    minimalModeEnabled = serializers.BooleanField()
+    confidenceScore = serializers.FloatField()
+    prioritiesSummary = serializers.CharField()
+    goals = serializers.ListField(child=serializers.CharField())
+
+
 class TodaySerializer(serializers.Serializer):
+    twinOverview = TwinOverviewSerializer()
     metrics = TodayMetricSerializer(many=True)
     priorities = serializers.ListField(child=serializers.CharField())
     actionQueue = ActionQueueItemSerializer(many=True)

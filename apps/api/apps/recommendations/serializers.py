@@ -8,6 +8,8 @@ class FeedItemSerializer(serializers.Serializer):
     detail = serializers.CharField()
     confidence = serializers.FloatField()
     why = serializers.CharField()
+    riskLevel = serializers.CharField()
+    sourceRefs = serializers.ListField(child=serializers.CharField())
     createdAt = serializers.DateTimeField()
 
 

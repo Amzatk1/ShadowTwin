@@ -9,6 +9,8 @@ class ApprovalQueueItemSerializer(serializers.Serializer):
     status = serializers.CharField()
     sourceLabel = serializers.CharField()
     dueLabel = serializers.CharField()
+    payloadKind = serializers.CharField(required=False, allow_blank=True)
+    sourceCount = serializers.IntegerField(required=False)
 
 
 class ApprovalQueueSerializer(serializers.Serializer):

@@ -66,6 +66,40 @@ export function Chip({ label }: { label: string }) {
   );
 }
 
+export function ToneChip({
+  label,
+  tone = "default",
+}: {
+  label: string;
+  tone?: "default" | "accent" | "success" | "warning" | "danger";
+}) {
+  return (
+    <View
+      style={[
+        styles.chip,
+        tone === "default" && styles.chipDefault,
+        tone === "accent" && styles.chipAccent,
+        tone === "success" && styles.chipSuccess,
+        tone === "warning" && styles.chipWarning,
+        tone === "danger" && styles.chipDanger,
+      ]}
+    >
+      <Text
+        style={[
+          styles.chipText,
+          tone === "default" && styles.chipTextDefault,
+          tone === "accent" && styles.chipTextAccent,
+          tone === "success" && styles.chipTextSuccess,
+          tone === "warning" && styles.chipTextWarning,
+          tone === "danger" && styles.chipTextDanger,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export function RowItem({
   title,
   detail,
@@ -77,6 +111,71 @@ export function RowItem({
     <View style={styles.rowItem}>
       <Text style={styles.rowTitle}>{title}</Text>
       <Text style={styles.rowDetail}>{detail}</Text>
+    </View>
+  );
+}
+
+export function ActionButton({
+  label,
+  onPress,
+  tone = "default",
+  disabled = false,
+}: {
+  label: string;
+  onPress: () => void;
+  tone?: "default" | "accent" | "danger";
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.actionButton,
+        tone === "accent" && styles.actionButtonAccent,
+        tone === "danger" && styles.actionButtonDanger,
+        disabled && styles.actionButtonDisabled,
+      ]}
+    >
+      <Text
+        style={[
+          styles.actionButtonText,
+          tone === "accent" && styles.actionButtonTextAccent,
+          tone === "danger" && styles.actionButtonTextDanger,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+export function InsightCard({
+  title,
+  detail,
+  meta,
+  chips,
+  actions,
+}: {
+  title: string;
+  detail: string;
+  meta?: string;
+  chips?: Array<{ label: string; tone?: "default" | "accent" | "success" | "warning" | "danger" }>;
+  actions?: ReactNode;
+}) {
+  return (
+    <View style={styles.insightCard}>
+      <Text style={styles.rowTitle}>{title}</Text>
+      <Text style={styles.rowDetail}>{detail}</Text>
+      {meta ? <Text style={styles.insightMeta}>{meta}</Text> : null}
+      {chips?.length ? (
+        <View style={styles.chipRow}>
+          {chips.map((chip) => (
+            <ToneChip key={`${chip.label}-${chip.tone ?? "default"}`} label={chip.label} tone={chip.tone} />
+          ))}
+        </View>
+      ) : null}
+      {actions ? <View style={styles.actionRow}>{actions}</View> : null}
     </View>
   );
 }
@@ -182,10 +281,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
   },
+  chipDefault: {
+    backgroundColor: palette.surfaceMuted,
+  },
+  chipAccent: {
+    backgroundColor: palette.accentSoft,
+  },
+  chipSuccess: {
+    backgroundColor: "rgba(57, 169, 118, 0.14)",
+  },
+  chipWarning: {
+    backgroundColor: "rgba(213, 163, 60, 0.14)",
+  },
+  chipDanger: {
+    backgroundColor: "rgba(217, 107, 107, 0.14)",
+  },
   chipText: {
     color: palette.accent,
     fontSize: 12,
     fontWeight: "600",
+  },
+  chipTextDefault: {
+    color: palette.textMuted,
+  },
+  chipTextAccent: {
+    color: palette.accent,
+  },
+  chipTextSuccess: {
+    color: palette.success,
+  },
+  chipTextWarning: {
+    color: palette.warning,
+  },
+  chipTextDanger: {
+    color: palette.danger,
   },
   rowItem: {
     borderRadius: radii.md,
@@ -205,6 +334,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 6,
+  },
+  insightCard: {
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceMuted,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  insightMeta: {
+    color: palette.textMuted,
+    fontSize: 11,
+    lineHeight: 18,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginTop: spacing.sm,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  actionButton: {
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+  },
+  actionButtonAccent: {
+    backgroundColor: palette.accentSoft,
+    borderColor: palette.accentSoft,
+  },
+  actionButtonDanger: {
+    backgroundColor: "rgba(217, 107, 107, 0.12)",
+    borderColor: "rgba(217, 107, 107, 0.28)",
+  },
+  actionButtonDisabled: {
+    opacity: 0.55,
+  },
+  actionButtonText: {
+    color: palette.text,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  actionButtonTextAccent: {
+    color: palette.accent,
+  },
+  actionButtonTextDanger: {
+    color: palette.danger,
   },
   primaryButton: {
     alignItems: "center",

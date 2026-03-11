@@ -108,6 +108,14 @@ JWT_AUDIENCE = env("JWT_AUDIENCE", default="shadowtwin-clients")
 JWT_ACCESS_LIFETIME_MINUTES = env.int("JWT_ACCESS_LIFETIME_MINUTES", default=15)
 JWT_REFRESH_LIFETIME_DAYS = env.int("JWT_REFRESH_LIFETIME_DAYS", default=30)
 
+GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID", default="")
+GOOGLE_CLIENT_SECRET = env("GOOGLE_CLIENT_SECRET", default="")
+GOOGLE_REDIRECT_URI = env(
+    "GOOGLE_REDIRECT_URI",
+    default="http://localhost:3000/workspace/integrations/google/callback",
+)
+INTEGRATION_ENCRYPTION_KEY = env("ENCRYPTION_KEY", default=SECRET_KEY)
+
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:3000", "http://localhost:8081"],

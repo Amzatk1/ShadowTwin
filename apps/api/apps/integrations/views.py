@@ -1,4 +1,7 @@
+from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django.core.signing import BadSignature, SignatureExpired
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -8,6 +11,7 @@ from apps.workspaces.models import Membership, Workspace
 
 from .models import IntegrationConnection
 from .serializers import (
+    GoogleCallbackSerializer,
     GoogleConnectSerializer,
     IntegrationConnectionSerializer,
     IntegrationListSerializer,
@@ -15,7 +19,7 @@ from .serializers import (
     IntegrationScopeSerializer,
     IntegrationScopeUpdateSerializer,
 )
-from .services import ensure_google_demo_connection
+from .services import complete_google_oauth_callback, start_google_connection
 
 
 def _serialize_connection(connection: IntegrationConnection):
@@ -25,8 +29,14 @@ def _serialize_connection(connection: IntegrationConnection):
         "provider": connection.provider,
         "displayName": connection.display_name,
         "accountLabel": connection.account_label,
+        "providerEmail": connection.provider_email,
         "mode": connection.mode,
         "status": connection.status,
+        "grantedScopes": connection.granted_scopes,
+        "requiresReauth": connection.requires_reauth,
+        "lastSyncError": connection.last_sync_error or None,
+        "capabilities": connection.capabilities,
+        "syncState": connection.sync_state,
         "lastSyncedAt": connection.last_synced_at,
         "scopes": IntegrationScopeSerializer(
             [
@@ -58,7 +68,7 @@ def _resolve_workspace(request, workspace_slug: str | None = None):
         .first()
     )
     if membership is None:
-        raise Workspace.DoesNotExist
+        raise Http404("No workspace membership found.")
     return membership.workspace
 
 
@@ -77,41 +87,34 @@ class GoogleConnectView(APIView):
         serializer = GoogleConnectSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         workspace = _resolve_workspace(request, serializer.validated_data["workspaceSlug"])
-        connection = ensure_google_demo_connection(
+        result = start_google_connection(
             workspace=workspace,
             user=request.user,
             mode=serializer.validated_data["mode"],
             selected_scopes=serializer.validated_data.get("selectedScopes", []),
         )
-        AuditEvent.objects.create(
-            workspace=workspace,
-            actor=request.user,
-            action_type="integration.google.connect",
-            object_type="integration_connection",
-            object_id=str(connection.id),
-            integration="google",
-            metadata={"mode": connection.mode},
-        )
         return Response(
             {
-                "integration": IntegrationConnectionSerializer(_serialize_connection(connection)).data,
-                "demoMode": True,
-                "requiresExternalConsent": False,
+                "integration": IntegrationConnectionSerializer(_serialize_connection(result["connection"])).data,
+                "demoMode": result["demoMode"],
+                "requiresExternalConsent": result["requiresExternalConsent"],
+                "authUrl": result["authUrl"],
             }
         )
 
 
 class GoogleCallbackView(APIView):
     def post(self, request):
-        serializer = GoogleConnectSerializer(data=request.data)
+        serializer = GoogleCallbackSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        workspace = _resolve_workspace(request, serializer.validated_data["workspaceSlug"])
-        connection = ensure_google_demo_connection(
-            workspace=workspace,
-            user=request.user,
-            mode=serializer.validated_data["mode"],
-            selected_scopes=serializer.validated_data.get("selectedScopes", []),
-        )
+        try:
+            connection = complete_google_oauth_callback(
+                user=request.user,
+                code=serializer.validated_data["code"],
+                state=serializer.validated_data["state"],
+            )
+        except (BadSignature, SignatureExpired, IntegrationConnection.DoesNotExist, RuntimeError) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"integration": IntegrationConnectionSerializer(_serialize_connection(connection)).data})
 
 
@@ -150,8 +153,7 @@ class IntegrationScopesView(APIView):
                 scope.learn_enabled = item["learnEnabled"]
             if "excluded" in item:
                 scope.is_excluded = item["excluded"]
-                if scope.is_excluded:
-                    scope.learn_enabled = False
+                scope.learn_enabled = not scope.is_excluded
             scope.save()
 
         AuditEvent.objects.create(

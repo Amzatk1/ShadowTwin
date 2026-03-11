@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Activity, Brain, CheckSquare, House, Settings } from "lucide-react-native";
+import { Text, View } from "react-native";
 
 import { CaptureModal } from "../components/ui";
 import { ActionsScreen } from "../screens/ActionsScreen";
@@ -9,16 +10,28 @@ import { OnboardingScreen } from "../screens/OnboardingScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { TodayScreen } from "../screens/TodayScreen";
 import { useAppStore } from "../store/useAppStore";
+import { useSessionStore } from "../store/useSessionStore";
 import { palette } from "../theme/tokens";
 
 const Tab = createBottomTabNavigator();
 
 export function RootNavigator() {
-  const onboarded = useAppStore((state) => state.onboarded);
   const captureOpen = useAppStore((state) => state.captureOpen);
   const closeCapture = useAppStore((state) => state.closeCapture);
+  const { accessToken, hasHydrated } = useSessionStore((state) => ({
+    accessToken: state.accessToken,
+    hasHydrated: state.hasHydrated,
+  }));
 
-  if (!onboarded) {
+  if (!hasHydrated) {
+    return (
+      <View style={{ flex: 1, backgroundColor: palette.background, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: palette.textMuted, fontSize: 14 }}>Loading ShadowTwin...</Text>
+      </View>
+    );
+  }
+
+  if (!accessToken) {
     return <OnboardingScreen />;
   }
 

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@shadowtwin/api-client": "*",
+    "@shadowtwin/config": "*",
     "@shadowtwin/shared-types": "*",
     "@tanstack/react-query": "^5.62.9",
     "@react-navigation/bottom-tabs": "^7.2.0",

@@ -1,4 +1,5 @@
-import { EmailView, WorkspaceShell } from "@/components/site";
+import { WorkspaceShell } from "@/components/site";
+import { EmailWorkspace } from "@/features/email/email-workspace";
 
 export default function EmailPage() {
   return (
@@ -6,8 +7,7 @@ export default function EmailPage() {
       title="Email Intelligence"
       subtitle="Priority threads, waiting-on queues, thread summaries, hidden obligation detection, and user-style drafts held behind approval."
     >
-      <EmailView />
+      <EmailWorkspace />
     </WorkspaceShell>
   );
 }
-

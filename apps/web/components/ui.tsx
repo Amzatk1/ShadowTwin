@@ -8,13 +8,19 @@ export function Button({
   href,
   children,
   variant = "primary",
+  onClick,
+  type = "button",
+  disabled = false,
 }: {
   href?: string;
   children: ReactNode;
   variant?: "primary" | "secondary" | "ghost";
+  onClick?: () => void;
+  type?: "button" | "submit" | "reset";
+  disabled?: boolean;
 }) {
   const className = cn(
-    "inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition duration-200",
+    "inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition duration-200 disabled:opacity-60",
     variant === "primary" && "bg-ink text-white hover:bg-black/90",
     variant === "secondary" && "border border-line bg-surface text-ink hover:bg-surface-muted",
     variant === "ghost" && "text-ink-muted hover:text-ink",
@@ -28,7 +34,11 @@ export function Button({
     );
   }
 
-  return <button className={className}>{children}</button>;
+  return (
+    <button className={className} disabled={disabled} onClick={onClick} type={type}>
+      {children}
+    </button>
+  );
 }
 
 export function Badge({
@@ -36,7 +46,7 @@ export function Badge({
   tone = "default",
 }: {
   children: ReactNode;
-  tone?: "default" | "accent" | "success";
+  tone?: "default" | "accent" | "success" | "warning" | "danger";
 }) {
   return (
     <span
@@ -45,6 +55,8 @@ export function Badge({
         tone === "default" && "border-line bg-surface text-ink-muted",
         tone === "accent" && "border-accent/15 bg-accent-soft text-accent",
         tone === "success" && "border-success/20 bg-success/10 text-success",
+        tone === "warning" && "border-warning/20 bg-warning/10 text-warning",
+        tone === "danger" && "border-danger/20 bg-danger/10 text-danger",
       )}
     >
       {tone === "accent" ? <Sparkles size={14} /> : null}
@@ -130,4 +142,3 @@ export function BulletList({ items }: { items: string[] }) {
     </ul>
   );
 }
-

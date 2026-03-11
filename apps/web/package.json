@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@shadowtwin/api-client": "*",
+    "@shadowtwin/config": "*",
     "@shadowtwin/design-tokens": "*",
     "@shadowtwin/sample-data": "*",
     "@shadowtwin/shared-types": "*",

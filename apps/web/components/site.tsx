@@ -303,7 +303,7 @@ function Hero() {
               Learn how you work. Then work with you.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-ink-muted">
-              ShadowTwin models your operating style across email, meetings, docs, tasks, and memory. It helps you prepare, prioritize, draft, and follow through with calm intelligence.
+              ShadowTwin models your operating style across email, meetings, docs, tasks, and memory. It is built first for founders and CEOs, but it also fits any high-context operator who needs calm intelligence for execution.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -456,6 +456,7 @@ export function ContentPage({
 }
 
 const workspaceNav = [
+  { href: "/workspace/setup", label: "Setup" },
   { href: "/workspace", label: "Today" },
   { href: "/workspace/feed", label: "Twin Feed" },
   { href: "/workspace/integrations", label: "Integrations" },

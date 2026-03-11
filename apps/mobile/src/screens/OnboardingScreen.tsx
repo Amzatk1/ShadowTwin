@@ -1,20 +1,32 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { onboardingSteps } from "../data/sample";
-import { useAppStore } from "../store/useAppStore";
+import { apiClient } from "../services/api";
+import { useSessionStore } from "../store/useSessionStore";
 import { palette, radii, spacing } from "../theme/tokens";
 
 export function OnboardingScreen() {
-  const finishOnboarding = useAppStore((state) => state.finishOnboarding);
+  const setSession = useSessionStore((state) => state.setSession);
+  const [email, setEmail] = useState("ayo@shadowtwin.demo");
+  const [password, setPassword] = useState("shadowtwin123");
+
+  const loginMutation = useMutation({
+    mutationFn: () => apiClient.auth.token(email, password),
+    onSuccess: async (payload) => {
+      await setSession(payload);
+    },
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
         <Text style={styles.eyebrow}>ShadowTwin</Text>
-        <Text style={styles.title}>A private operational twin for how you actually work.</Text>
+        <Text style={styles.title}>A private operational twin for how high-context people actually work.</Text>
         <Text style={styles.copy}>
-          Start with minimal sync, visible permissions, and approval-first suggestions. The twin learns gradually and stays transparent.
+          Built for founders first, but usable by any operator who needs a calm, trust-first layer across scattered work.
         </Text>
         <View style={styles.stack}>
           {onboardingSteps.map((step) => (
@@ -26,11 +38,34 @@ export function OnboardingScreen() {
         </View>
         <View style={styles.footer}>
           <View style={styles.notice}>
-            <Text style={styles.noticeText}>Minimal mode available. Sensitive sources can stay excluded.</Text>
+            <Text style={styles.noticeText}>Minimal mode available. Source connection and scope control stay on web first.</Text>
           </View>
-          <Pressable onPress={finishOnboarding} style={styles.button}>
-            <Text style={styles.buttonText}>Continue</Text>
+          <TextInput
+            autoCapitalize="none"
+            keyboardType="email-address"
+            onChangeText={setEmail}
+            placeholder="Email"
+            placeholderTextColor={palette.textMuted}
+            style={styles.input}
+            value={email}
+          />
+          <TextInput
+            autoCapitalize="none"
+            onChangeText={setPassword}
+            placeholder="Password"
+            placeholderTextColor={palette.textMuted}
+            secureTextEntry
+            style={styles.input}
+            value={password}
+          />
+          <Pressable onPress={() => loginMutation.mutate()} style={styles.button}>
+            <Text style={styles.buttonText}>{loginMutation.isPending ? "Signing in..." : "Continue"}</Text>
           </Pressable>
+          {loginMutation.isError ? (
+            <Text style={styles.errorText}>
+              {loginMutation.error instanceof Error ? loginMutation.error.message : "Unable to sign in."}
+            </Text>
+          ) : null}
         </View>
       </View>
     </SafeAreaView>
@@ -109,9 +144,24 @@ const styles = StyleSheet.create({
     backgroundColor: palette.accent,
     paddingVertical: 16,
   },
+  input: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surface,
+    color: palette.text,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    fontSize: 15,
+  },
   buttonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
+  },
+  errorText: {
+    color: "#F4A5A5",
+    fontSize: 13,
+    lineHeight: 20,
   },
 });

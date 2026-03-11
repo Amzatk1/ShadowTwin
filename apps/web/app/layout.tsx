@@ -19,7 +19,7 @@ const body = Manrope({
 
 export const metadata: Metadata = {
   title: "ShadowTwin",
-  description: "A private operational twin for founders, operators, and high-performance teams.",
+  description: "A private operational twin built first for founders and CEOs, but usable by any high-context operator who needs a calm execution layer.",
 };
 
 export default function RootLayout({

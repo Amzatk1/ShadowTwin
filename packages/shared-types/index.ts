@@ -14,6 +14,15 @@ export interface TodayMetric {
   delta: string;
 }
 
+export interface TwinOverview {
+  operatorRole: string;
+  stage: TwinStage;
+  minimalModeEnabled: boolean;
+  confidenceScore: number;
+  prioritiesSummary: string;
+  goals: string[];
+}
+
 export interface WorkspaceProfile {
   id: string;
   name: string;
@@ -55,6 +64,8 @@ export interface TwinObservation {
   detail: string;
   confidence: number;
   why: string;
+  riskLevel: "high" | "medium" | "low";
+  sourceRefs: string[];
   createdAt: string;
 }
 
@@ -82,6 +93,8 @@ export interface ApprovalRequest {
   status: "pending" | "approved" | "rejected" | "snoozed" | "edited";
   sourceLabel: string;
   dueLabel: string;
+  payloadKind?: string;
+  sourceCount?: number;
 }
 
 export interface NotificationEvent {
@@ -91,9 +104,12 @@ export interface NotificationEvent {
   body: string;
   channel: "push" | "email" | "in-app";
   createdAt: string;
+  status?: string;
+  actionUrl?: string;
 }
 
 export interface TodayDashboard {
+  twinOverview: TwinOverview;
   metrics: TodayMetric[];
   priorities: string[];
   actionQueue: ActionItem[];
@@ -130,8 +146,14 @@ export interface IntegrationConnection {
   provider: string;
   displayName: string;
   accountLabel: string;
+  providerEmail: string;
   mode: "read-only" | "approval-required" | "action-enabled";
   status: string;
+  grantedScopes: string[];
+  requiresReauth: boolean;
+  lastSyncError: string | null;
+  capabilities: Record<string, unknown>;
+  syncState: Record<string, unknown>;
   lastSyncedAt: string | null;
   scopes: IntegrationScope[];
 }
@@ -162,4 +184,51 @@ export interface AuditEventRecord {
   integration: string;
   createdAt: string;
   metadata: Record<string, unknown>;
+}
+
+export interface MemoryRecord {
+  id: string;
+  itemType: string;
+  sourceLabel: string;
+  title: string;
+  summary: string;
+  content: string;
+  learnEnabled: boolean;
+  hidden: boolean;
+  createdAt: string;
+}
+
+export interface EmailThreadRecord {
+  id: string;
+  subject: string;
+  participants: string[];
+  waitingOn: string;
+  needsReply: boolean;
+  isSensitive: boolean;
+  summary: string;
+  status: string;
+  sourceUrl: string;
+  lastMessageAt: string | null;
+  messageCount: number;
+  extractedCommitments: string[];
+}
+
+export interface MeetingRecord {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string | null;
+  participants: string[];
+  priority: "high" | "medium" | "low";
+  summary: string;
+  extractedActions: string[];
+}
+
+export interface OnboardingProfile {
+  workspaceSlug: string;
+  operatorRole: string;
+  goals: string[];
+  minimalModeEnabled: boolean;
+  stage: TwinStage;
+  completedAt: string | null;
 }

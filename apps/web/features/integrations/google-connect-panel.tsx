@@ -34,6 +34,7 @@ export function GoogleConnectPanel({
   const [selectedScopes, setSelectedScopes] = useState<string[]>(
     defaultScopes.map((scope) => scope.sourcePath),
   );
+  const [statusCopy, setStatusCopy] = useState<string | null>(null);
 
   const connectMutation = useMutation({
     mutationFn: () =>
@@ -42,14 +43,26 @@ export function GoogleConnectPanel({
         mode: "read-only",
         selectedScopes,
       }),
-    onSuccess: async () => {
+    onSuccess: async (payload) => {
+      if (payload.authUrl) {
+        window.location.assign(payload.authUrl);
+        return;
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["integrations", workspaceSlug] }),
         queryClient.invalidateQueries({ queryKey: ["today", workspaceSlug] }),
         queryClient.invalidateQueries({ queryKey: ["feed", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["email-threads", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings-workspace", workspaceSlug] }),
+        queryClient.invalidateQueries({ queryKey: ["notifications", workspaceSlug] }),
         queryClient.invalidateQueries({ queryKey: ["privacy", workspaceSlug] }),
         queryClient.invalidateQueries({ queryKey: ["audit", workspaceSlug] }),
       ]);
+      setStatusCopy(
+        payload.demoMode
+          ? "Google OAuth is not configured in this environment yet, so ShadowTwin connected the local demo workspace to keep the observe/suggest loop usable."
+          : "Google consent started. Finish account approval in the opened window to begin the first live sync.",
+      );
     },
   });
 
@@ -100,11 +113,16 @@ export function GoogleConnectPanel({
           Connect Google
         </Button>
       </div>
+      {statusCopy ? (
+        <div className="mt-4 rounded-2xl border border-line bg-canvas px-4 py-3 text-sm text-ink-muted">
+          {statusCopy}
+        </div>
+      ) : null}
       {connectMutation.isError ? (
         <div className="mt-4 rounded-2xl border border-line bg-canvas px-4 py-3 text-sm text-ink-muted">
           {connectMutation.error instanceof Error
             ? connectMutation.error.message
-            : "Unable to connect Google in demo mode."}
+            : "Unable to start the Google connection flow."}
         </div>
       ) : null}
     </Panel>
