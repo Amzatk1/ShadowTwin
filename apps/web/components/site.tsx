@@ -458,6 +458,7 @@ export function ContentPage({
 const workspaceNav = [
   { href: "/workspace", label: "Today" },
   { href: "/workspace/feed", label: "Twin Feed" },
+  { href: "/workspace/integrations", label: "Integrations" },
   { href: "/workspace/email", label: "Email" },
   { href: "/workspace/meetings", label: "Meetings" },
   { href: "/workspace/memory", label: "Memory" },

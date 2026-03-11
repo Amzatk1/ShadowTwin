@@ -14,18 +14,8 @@ export function LoginPanel() {
   const [password, setPassword] = useState("shadowtwin123");
 
   const loginMutation = useMutation({
-    mutationFn: async () => apiClient.auth.login(email, password),
-    onSuccess: (payload) => {
-      setSession({
-        accessToken: payload.accessToken,
-        refreshToken: payload.refreshToken,
-        workspaceSlug: payload.workspaceSlug,
-        user: {
-          email: payload.user.email,
-          fullName: payload.user.fullName,
-        },
-      });
-    },
+    mutationFn: async () => apiClient.auth.token(email, password),
+    onSuccess: (payload) => setSession(payload),
   });
 
   return (
@@ -74,4 +64,3 @@ export function LoginPanel() {
     </div>
   );
 }
-

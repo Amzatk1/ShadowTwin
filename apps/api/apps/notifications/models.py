@@ -10,5 +10,6 @@ class Notification(models.Model):
     title = models.CharField(max_length=255)
     body = models.TextField()
     status = models.CharField(max_length=32, default="queued")
+    action_url = models.CharField(max_length=255, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-

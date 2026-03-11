@@ -25,7 +25,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
-    "rest_framework.authtoken",
     "apps.accounts",
     "apps.authn",
     "apps.workspaces",
@@ -95,13 +94,19 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "apps.authn.authentication.ShadowTwinJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
+
+JWT_SIGNING_KEY = env("JWT_SIGNING_KEY", default=SECRET_KEY)
+JWT_ISSUER = env("JWT_ISSUER", default="shadowtwin-api")
+JWT_AUDIENCE = env("JWT_AUDIENCE", default="shadowtwin-clients")
+JWT_ACCESS_LIFETIME_MINUTES = env.int("JWT_ACCESS_LIFETIME_MINUTES", default=15)
+JWT_REFRESH_LIFETIME_DAYS = env.int("JWT_REFRESH_LIFETIME_DAYS", default=30)
 
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",

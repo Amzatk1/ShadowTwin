@@ -1,7 +1,6 @@
 from datetime import datetime, UTC
 
 from django.contrib.auth import get_user_model
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from apps.approvals.models import ApprovalRequest
@@ -68,18 +67,27 @@ class TodayFlowTests(APITestCase):
             source_label="Gmail",
             due_label="Before 15:00",
         )
-        self.token, _ = Token.objects.get_or_create(user=self.user)
 
     def test_login_today_and_approval_decision_flow(self):
         login_response = self.client.post(
-            "/api/v1/auth/login/",
+            "/api/v1/auth/token/",
             {"email": "ayo@shadowtwin.demo", "password": "shadowtwin123"},
             format="json",
         )
         self.assertEqual(login_response.status_code, 200)
         self.assertEqual(login_response.data["workspaceSlug"], self.workspace.slug)
+        self.assertIn("workspace", login_response.data)
 
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        refresh_response = self.client.post(
+            "/api/v1/auth/refresh/",
+            {"refreshToken": login_response.data["refreshToken"]},
+            format="json",
+        )
+        self.assertEqual(refresh_response.status_code, 200)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {refresh_response.data['accessToken']}"
+        )
 
         today_response = self.client.get(f"/api/v1/today/{self.workspace.slug}/")
         self.assertEqual(today_response.status_code, 200)
@@ -96,4 +104,3 @@ class TodayFlowTests(APITestCase):
         )
         self.assertEqual(decision_response.status_code, 200)
         self.assertEqual(decision_response.data["status"], "approved")
-

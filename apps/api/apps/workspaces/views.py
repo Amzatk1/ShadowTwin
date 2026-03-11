@@ -3,8 +3,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.approvals.models import ApprovalRequest
+from apps.email_intelligence.models import EmailThread
+from apps.integrations.models import IntegrationConnection
 from apps.meetings.models import Meeting
-from apps.recommendations.models import Insight
+from apps.recommendations.models import Insight, Recommendation
 
 from .models import Membership, Workspace
 from .serializers import TodaySerializer
@@ -25,31 +27,55 @@ class TodayDashboardView(APIView):
         approvals = list(
             ApprovalRequest.objects.filter(workspace=workspace).order_by("-created_at")[:3]
         )
+        recommendations = list(
+            Recommendation.objects.filter(workspace=workspace)
+            .exclude(status="dismissed")
+            .order_by("-pinned_at", "-created_at")[:5]
+        )
         meetings = list(Meeting.objects.filter(workspace=workspace).order_by("starts_at")[:3])
         insights = list(Insight.objects.filter(workspace=workspace).order_by("-created_at")[:3])
+        connection_count = IntegrationConnection.objects.filter(workspace=workspace, is_enabled=True).count()
+        reply_risk_count = EmailThread.objects.filter(workspace=workspace, needs_reply=True).count()
+        priorities = [item.title for item in recommendations[:3]]
+        priorities.extend(
+            [
+                f"Meeting brief ready for {meeting.title}"
+                for meeting in meetings[:1]
+            ]
+        )
         payload = {
             "metrics": [
-                {"label": "Follow-ups prevented", "value": "12", "delta": "+3 this week"},
-                {"label": "Meetings prepped", "value": str(len(meetings)), "delta": "Ready for today"},
-                {"label": "Hours saved", "value": "7.4", "delta": "Projected this week"},
-                {"label": "Draft acceptance", "value": "84%", "delta": "Style confidence rising"},
+                {"label": "Connected sources", "value": str(connection_count), "delta": "Google-first observe mode"},
+                {"label": "Meetings prepped", "value": str(len(meetings)), "delta": "Read-only brief generation"},
+                {"label": "Reply risks", "value": str(reply_risk_count), "delta": "Flagged from inbox patterns"},
+                {"label": "Twin confidence", "value": "84%", "delta": "Signals grounded in source traces"},
             ],
-            "priorities": [
-                "Investor follow-up window closes at 15:00",
-                "Meeting brief ready for Daniel Moss at 14:30",
-                "Three follow-ups may slip before 17:00",
-            ],
-            "actionQueue": [
-                {
-                    "id": str(approval.id),
-                    "title": approval.proposed_action,
-                    "description": approval.why_suggested,
-                    "status": APPROVAL_TO_ACTION_STATUS.get(approval.status, "attention"),
-                    "source": approval.source_label,
-                    "dueLabel": approval.due_label,
-                }
-                for approval in approvals
-            ],
+            "priorities": priorities,
+            "actionQueue": (
+                [
+                    {
+                        "id": str(approval.id),
+                        "title": approval.proposed_action,
+                        "description": approval.why_suggested,
+                        "status": APPROVAL_TO_ACTION_STATUS.get(approval.status, "attention"),
+                        "source": approval.source_label,
+                        "dueLabel": approval.due_label,
+                    }
+                    for approval in approvals
+                ]
+                if approvals
+                else [
+                    {
+                        "id": str(item.id),
+                        "title": item.title,
+                        "description": item.detail,
+                        "status": "attention",
+                        "source": "ShadowTwin",
+                        "dueLabel": f"{item.risk_level} risk",
+                    }
+                    for item in recommendations[:3]
+                ]
+            ),
             "meetings": [
                 {
                     "id": str(meeting.id),

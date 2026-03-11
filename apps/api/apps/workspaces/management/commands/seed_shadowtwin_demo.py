@@ -2,9 +2,9 @@ from datetime import datetime, UTC
 
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from rest_framework.authtoken.models import Token
 
 from apps.approvals.models import ApprovalRequest
+from apps.authn.models import AuthSession
 from apps.meetings.models import Meeting
 from apps.recommendations.models import Insight, Recommendation
 from apps.twins.models import TwinProfile
@@ -102,9 +102,8 @@ class Command(BaseCommand):
                 "status": "pending",
             },
         )
-        token, _ = Token.objects.get_or_create(user=user)
+        AuthSession.objects.filter(user=user, workspace=workspace).delete()
 
         self.stdout.write(self.style.SUCCESS("Seeded demo workspace: founder-shadow"))
         self.stdout.write("Demo login: ayo@shadowtwin.demo / shadowtwin123")
-        self.stdout.write(f"API token: {token.key}")
         self.stdout.write(f"Primary approval id: {approval.id}")

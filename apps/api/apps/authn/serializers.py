@@ -6,8 +6,13 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField()
 
 
-class LoginResponseSerializer(serializers.Serializer):
+class TokenResponseSerializer(serializers.Serializer):
     accessToken = serializers.CharField()
     refreshToken = serializers.CharField()
     workspaceSlug = serializers.CharField()
+    workspace = serializers.DictField()
     user = serializers.DictField()
+
+
+class RefreshSerializer(serializers.Serializer):
+    refreshToken = serializers.CharField()

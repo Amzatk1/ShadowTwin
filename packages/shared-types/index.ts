@@ -5,6 +5,7 @@ export interface UserProfile {
   name: string;
   role: string;
   workspaceId: string;
+  workspace?: WorkspaceProfile;
 }
 
 export interface TodayMetric {
@@ -90,4 +91,75 @@ export interface NotificationEvent {
   body: string;
   channel: "push" | "email" | "in-app";
   createdAt: string;
+}
+
+export interface TodayDashboard {
+  metrics: TodayMetric[];
+  priorities: string[];
+  actionQueue: ActionItem[];
+  meetings: MeetingBrief[];
+  insights: TwinInsight[];
+}
+
+export interface SessionUser {
+  id: string;
+  email: string;
+  fullName: string;
+}
+
+export interface SessionPayload {
+  accessToken: string;
+  refreshToken: string;
+  workspaceSlug: string;
+  workspace: WorkspaceProfile;
+  user: SessionUser;
+}
+
+export interface IntegrationScope {
+  id: string;
+  sourcePath: string;
+  displayName: string;
+  sourceType: string;
+  mode: "read-only" | "approval-required" | "action-enabled";
+  learnEnabled: boolean;
+  excluded: boolean;
+}
+
+export interface IntegrationConnection {
+  id: string;
+  provider: string;
+  displayName: string;
+  accountLabel: string;
+  mode: "read-only" | "approval-required" | "action-enabled";
+  status: string;
+  lastSyncedAt: string | null;
+  scopes: IntegrationScope[];
+}
+
+export interface PrivacySettings {
+  retentionDays: number;
+  actionDisabledMode: boolean;
+  localFirstEnabled: boolean;
+  learningEnabled: boolean;
+  approvalMode: string;
+}
+
+export interface PrivacySnapshot {
+  controls: Array<
+    PrivacyControl & {
+      learnEnabled: boolean;
+      excluded: boolean;
+    }
+  >;
+  settings: PrivacySettings;
+}
+
+export interface AuditEventRecord {
+  id: string;
+  actionType: string;
+  objectType: string;
+  objectId: string;
+  integration: string;
+  createdAt: string;
+  metadata: Record<string, unknown>;
 }
